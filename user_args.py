@@ -47,7 +47,7 @@ class UARGS:
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
-    ZSCORING            =   "zscore" # True
+    NO_ZSCORING         =   "no_zscore" # True
     PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
 
@@ -66,7 +66,7 @@ ARGS_PROPERTIES = {
     UARGS.OUTFILE: {   # outfile 
         ArgPropKey.DEFAULT:     sys.stdout,
         ArgPropKey.TYPE:        argparse.FileType('x'),
-        ArgPropKey.HELP:        'Path for a NON-EXISTING .csv formated profile',
+        ArgPropKey.HELP:        'Path of NON-EXISTING .csv file for the generated profile.',
         ArgPropKey.METAVAR:     '<*.csv [stdout]>',
         ArgPropKey.SHORT_FLAG:  '-o',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.OUTFILE,   
@@ -116,7 +116,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.MAX:     10,
-        ArgPropKey.HELP:    '# of bins of do divide the QualityScore values. The profiler averages the errorss in each bin.',
+        ArgPropKey.HELP:    '# of bins of do divide the QualityScore values. The profiler averages the QError rate in each bin.',
         ArgPropKey.SHORT_FLAG: '-sb',
         ArgPropKey.LONG_FLAG:   '--'+ UARGS.SCORE_BINS_COUNT,
     },
@@ -125,7 +125,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE: int,
         ArgPropKey.MIN: 1,
         ArgPropKey.MAX: 15,
-        ArgPropKey.HELP: 'The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments thus error is averaged for each fragment.',
+        ArgPropKey.HELP: 'The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments thus QEerror is averaged for each fragment.',
         ArgPropKey.SHORT_FLAG: '-cb',
         ArgPropKey.LONG_FLAG: '--' + UARGS.CYC_BINS_COUNT,
     },
@@ -149,23 +149,23 @@ ARGS_PROPERTIES = {
         ArgPropKey.DEFAULT: None,
         ArgPropKey.TYPE: int,
         ArgPropKey.HELP: 'NaN representation for missing values, may be removed/imputed downstream',
-        ArgPropKey.METAVAR: '<int[None]>',
+        ArgPropKey.METAVAR: '<int [None]>',
         ArgPropKey.SHORT_FLAG: '-mv',
         ArgPropKey.LONG_FLAG: '--' + UARGS.NAN_REP,
     },
-    UARGS.ZSCORING: {
-        ArgPropKey.DEFAULT:     True,
+    UARGS.NO_ZSCORING: {
+        ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'ZScooring the final profile',
-        ArgPropKey.SHORT_FLAG:  '-z',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.ZSCORING,
+        ArgPropKey.HELP:        'NO ZScoring the final profile',
+        ArgPropKey.SHORT_FLAG:  '-nZ',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_ZSCORING,
         ArgPropKey.ACTION:      'store_true',
     },
     UARGS.COV_TYPE: {   # outfile 
         ArgPropKey.DEFAULT:     "cntxt",
         ArgPropKey.TYPE:        str,
         ArgPropKey.CHOICES:     ["cntxt", "cyc", "cntxt_cyc"],
-        ArgPropKey.HELP:        'Covariats type to profile errors. Profiling may take into account errors context, cycle or both',
+        ArgPropKey.HELP:        'Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or both (context + cycle).',
         ArgPropKey.METAVAR:     '<' + UARGS.COV_TYPE + '>',
         ArgPropKey.SHORT_FLAG:  '-ct',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
@@ -174,7 +174,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.DEFAULT:     "err_mean_and_freq",
         ArgPropKey.TYPE:        str,
         ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
-        ArgPropKey.HELP:        'Profile may include calculation of average error and/or frequency per covariance (context or cycle).',
+        ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
         ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
         ArgPropKey.SHORT_FLAG:  '-pt',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
@@ -183,7 +183,7 @@ ARGS_PROPERTIES = {
 
 
 BQ_STAT_PROFILER_DESC = "br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \
-    "Generates profile for each ReadGropup in the stat report. The profiles for the ReadGroup are tabulated in dataframe and saved in CSV format"
+    "It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output for further processing."
 
 def complements_info(args_properties):
     for key, _ in args_properties.items():
@@ -206,16 +206,16 @@ def complete_args_prop_info(args_properties):
         
     ## substitute min max values in help string
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
-        f'<int val>{args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]}[{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
+        f'<int min={args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]} [{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.MIN_ERR_OBSRV][ArgPropKey.METAVAR] = \
-        f'< int {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]}-{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]}[{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int between {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.METAVAR] =  \
-        f'<int {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]}-{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]}[{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int between {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
-        f'<int {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]}-{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]}[{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int between {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
 
     return args_properties
 
@@ -262,10 +262,8 @@ def check_int_scope(arg_props, args):
         if ArgPropKey.MAX in prop:  # only max value was given
             arg_value = getattr(args, key)
             if arg_value > prop[ArgPropKey.MAX]:
-                raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")
-        
+                raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")        
     return
-
 
 def check_csv_exists(filename):
     if not os.path.exists(filename): # older format missing
@@ -313,81 +311,17 @@ def load_parser():
             parser_add_arg(parser, props)
     return parser
    
-
-# def parse_arguments(cmd_args):
-#     parser = load_parser()  
-#     args = parser.parse_args(cmd_args)
-#     return check_args(args)
-
-# # check_min_max cycle
-# def parse_arguments_old(arg_props, cmd_args):
-#     parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)
-#     for _, props in arg_props.items():
-#         store_true = (props.get(ArgPropKey.ACTION) == 'store_true')
-#         if store_true:
-#             parser_add_bool(parser, props)    
-#         else:
-#             parser_add_arg(parser, props)
-    
-#     args = parser.parse_args(cmd_args)
-#     adict = vars(args)
-#     # check arguments 
-#     check_int_scope(arg_props, args)
-#     if args.concat_older: 
-#         check_csv_exists(args.concat_older)
-#     check_min_max_cycle(args)
-    
-#     return adict
-
 if __name__ == "__main__":
     
     # # cmd = "--infile temp.txt --outfile test"
     cmd = "--infile temp.txt --concat_older bla.csv"
     # cmd = ""
     
-    # args_dict = parse_arguments(cmd.split())
     parser = load_parser()  
     args = parser.parse_args(cmd.split())
     check_args(args)
     args_dict = vars(args)
-    # [print(key,":",val) for key,val in args_dict.items()] 
-    # print(args_dict)
-    # parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)
-    # for key, props in arg_properties.items():
-    #     store_true = (props.get(ArgPropKey.ACTION) == 'store_true')
-    #     if store_true:
-    #         parser_add_bool(parser, props)    
-    #     else:
-    #         parser_add_arg(parser, props)
-        
-    # # cmd = "--infile temp.txt --outfile test"
-    # # cmd = "--infile temp.txt --concat_older bla.csv"
-    # cmd = ""
-    # args = parser.parse_args(cmd.split())
-    # args_dict = vars(args)
-
-    # # # print the dictionary
-    # # import pprint
-    # [print(key,":",val) for key,val in args_dict.items()] 
-
-    # check_int_scope(arg_properties, args)
-    # if args.concat_older: 
-    #     check_csv_exists(args.concat_older)
-    # check_min_max_cycle(args)
-    
-    # # test_outfiles(arg_properties, args)
-    # # avoid --add without providing existing outfile
-    # # avoid existing outfile without add
-    # # avoid infile and outfile identical
-
-    # print("=================================")
-
-    # # with args.infile as f:
-    # #     print(f.readline())
-    # # with open(args.outfile,"+w") as fout:
-    # outf = args.outfile
-    # outf.write("bbbbbbb\n")
-    # outf.close()
+    [print(key,":",val) for key,val in args_dict.items()] 
     # print(args_dict[UARGS.INFILE])
     parser.print_help()
 

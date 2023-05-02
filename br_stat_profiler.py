@@ -168,7 +168,7 @@ def calculate_stat_rt2_df(item_rt2_df, item_colname):
     return item_rt2_stat_df
 
 # add to a stat_df all the missing values from the full collection  of the values
-def complete_missing_values(stat_df, items_full_collection, args_dict):
+def complete_missing_values(stat_df, items_full_collection):
     item_colname = stat_df.columns[RT2_STAT.COV_TYPE_COL_IDX]  # covariate type
     missing_df = stat_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[item_colname] \
         .apply(lambda x: list(set(items_full_collection) - set(x))) \
@@ -238,7 +238,7 @@ def prepare_stat_df(rt2_df, mode, args_dict):  # mode = either RC_TAB2.CYC_COV o
         full_library = [''.join(comb) for comb in combinations]
 
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
-    rt2_stat_df = complete_missing_values(rt2_stat_df, full_library, args_dict)
+    rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
     rt2_stat_df = add_id_column(rt2_stat_df)
     rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL]) # univorm order before profile extraction
     return rt2_stat_df
@@ -278,7 +278,7 @@ def extract_profiles_from_stat_df(stat_df, key_colname, val_colname, row_idx_col
     return profiles_df.sort_index()
     
 
-def extract_profile(stat_df, args_dict, zscoring):
+def extract_profile(stat_df, args_dict, no_zscoring):
     scaler          = StandardScaler()
     err_profile     = pd.DataFrame()
     freq_profile    = pd.DataFrame()
@@ -286,7 +286,7 @@ def extract_profile(stat_df, args_dict, zscoring):
     if args_dict[UARGS.PROFILE_TYPE] == "err_mean" or args_dict[UARGS.PROFILE_TYPE] == "err_mean_and_freq":
         err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
                                        RT2_STAT.QLTY_ERR_AVG_COL, RT2_STAT.ID_COL)
-        if zscoring:
+        if not no_zscoring:
             err_profile = pd.DataFrame(scaler.fit_transform(err_profile),
                                            columns=err_profile.columns, index=err_profile.index)
         if args_dict[UARGS.NAN_REP]: # nan_rep != None
@@ -299,7 +299,7 @@ def extract_profile(stat_df, args_dict, zscoring):
         freq_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
                                         RT2_STAT.FREQ_IN_RG_COL, RT2_STAT.ID_COL)
         
-        if zscoring:
+        if not no_zscoring:
             freq_profile = pd.DataFrame(scaler.fit_transform(freq_profile),
                                          columns=freq_profile.columns, index=freq_profile.index)
         if args_dict[UARGS.NAN_REP]: # nan_rep != None
@@ -317,14 +317,14 @@ def extract_profile(stat_df, args_dict, zscoring):
 def profile_rt(pre_stat_df, args_dict):
     if args_dict[UARGS.COV_TYPE] == "cntxt" or args_dict[UARGS.COV_TYPE] == "cntxt_cyc":
         cntxt_rt2_stat_df = prepare_stat_df(pre_stat_df, RC_TAB2.CNTXT_COV, args_dict)
-        cntxt_profile = extract_profile(cntxt_rt2_stat_df, args_dict, args_dict[UARGS.ZSCORING])
+        cntxt_profile = extract_profile(cntxt_rt2_stat_df, args_dict, args_dict[UARGS.NO_ZSCORING])
 
     if args_dict[UARGS.COV_TYPE]== "cntxt":
         return cntxt_profile
 
     if args_dict[UARGS.COV_TYPE] == "cyc" or args_dict[UARGS.COV_TYPE] == "cntxt_cyc":
         cyc_rt2_stat_df = prepare_stat_df(pre_stat_df, RC_TAB2.CYC_COV, args_dict)
-        cyc_profile = extract_profile(cyc_rt2_stat_df, args_dict, args_dict[UARGS.ZSCORING])
+        cyc_profile = extract_profile(cyc_rt2_stat_df, args_dict, args_dict[UARGS.NO_ZSCORING])
 
     if args_dict[UARGS.COV_TYPE] == "cyc":
         return cyc_profile
@@ -351,29 +351,25 @@ def save_profile(new_profile, args_dict):
     f.flush()
 
 if __name__ == "__main__":
-    RECAL_TABLE_DIR = "./data/test_bqsr/"
-    REC_TAB_FULL_PATH = \
-        RECAL_TABLE_DIR + "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    
+    parser = load_parser()
+    # testing  code
+    # =================================================================
+    # RECAL_TABLE_DIR = "./data/test_bqsr/"
+    # REC_TAB_FULL_PATH = \
+    #     RECAL_TABLE_DIR + "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
     # cmd = f"--infile {REC_TAB_FULL_PATH}"
-    # adict = parse_arguments(args_props, cmd.split())
-    cmd = f"--infile {REC_TAB_FULL_PATH}"
-    parser = load_parser()  
-    args = parser.parse_args(cmd.split())
-    # ===============================================    
-    # args = parser.parse_args()
+    # args = parser.parse_args(cmd.split())
+    # # =================================================================  
+    # production code
+    args = parser.parse_args()
     # ===============================================
+    
     adict = check_args(args) 
-    
-        # print(args_dict)
     # [print(key,":",val) for key,val in adict.items()] 
-
-    
     rt2_pre_stat_df = preprocess_recal_table(adict)
     profile = profile_rt(rt2_pre_stat_df, adict)
     save_profile(profile, adict)
-    
-    print(profile.head())
-    print(type(adict[UARGS.OUTFILE]))
-    
+    # print(profile.head())
+    # print(type(adict[UARGS.OUTFILE]))
+    # create new dataframe
     

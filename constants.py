@@ -61,8 +61,8 @@ class CYC_RT2:
     CYC_COL = RC_TAB2.CYC_COV
     CYC_BIN_COL = "CycleQunatile"
 
-# class CNTXT_RT2:
-#     CNTXT_COL = RC_TAB2.CNTXT_COV
+class CNTXT_RT2:
+    CNTXT_COL = RC_TAB2.CNTXT_COV
 
 class RANGES:   # for plotting the stat table
     SCORE_BIN = "RG_ScoreBin_Ranges"
