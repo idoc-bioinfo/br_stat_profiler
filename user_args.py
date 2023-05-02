@@ -116,7 +116,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.MAX:     10,
-        ArgPropKey.HELP:    '# of bins of do divide the QualityScore values. The profiler averages the QError rate in each bin.',
+        ArgPropKey.HELP:    '# of bins of do divide the QualityScore values (The profiler further averages the QError rate in each bin).',
         ArgPropKey.SHORT_FLAG: '-sb',
         ArgPropKey.LONG_FLAG:   '--'+ UARGS.SCORE_BINS_COUNT,
     },

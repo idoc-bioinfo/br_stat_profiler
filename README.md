@@ -8,7 +8,7 @@
 - [Contact](#contact)
   
 ## Installation <a name="installation"></a>
-straight forward, just copy the py files under the same directory
+Straight forward, just copy the py files under the same directory
 ## Usage<a name="usage"></a>
 ```plaintext
 usage: br_stat_profiler.py  [-h] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>] [-a <*.csv>] [-mq <int min=1 [1]>] 
@@ -55,7 +55,7 @@ GATK (V4.4.0.0) BaseRecalibrator Report
 ### **Output**
 a CSV format file (or stream)
 
-#### **Ouput Example**: profile of GATKReport with a single  ReadGroup)
+#### **Ouput Example**: profile of GATKReport with a single  ReadGroup  (HVWKMCCXY)
 ```plaintext
                            HVWKMCCXY
 QltyErrAvg:AAAA:0:Context  -1.041131
@@ -64,17 +64,21 @@ QltyErrAvg:AAAA:2:Context  -1.041131
 QltyErrAvg:AAAA:3:Context   0.705112
 QltyErrAvg:AAAC:0:Context  -0.898580
 ```
-**row_index** is comprized of 4 components joined with the ":" as seperator:  
- ##### **< CALCULATION&nbsp;&nbsp;:&nbsp;&nbsp;COV_VALUE&nbsp;&nbsp;:&nbsp;&nbsp;QERR_SCORE_BIN&nbsp;&nbsp;:&nbsp;&nbsp;COVARIATE >**
+**row_index** is comprised of 4 tokens joined with ":" as seperator:  
+ ##### **< CALCULATION &nbsp;&nbsp;:&nbsp;&nbsp; COV_VALUE &nbsp;&nbsp;:&nbsp;&nbsp; Q_SCORE_BIN &nbsp;&nbsp;:&nbsp;&nbsp; COVARIATE >**
 
-        CALCULATION     - Option I) QltyErrAvg for QError Average per ReadGroup.  
-                          Option II) FreqInRG for COV Frequency per ReadGroup   
-        COV_VALUE       - Option I) Genomic context of the error (i.e "AAAA")  
-                          Option II) Read Cycle Bin which corrosponds to a position range on the read
-        QERR_SCORE_BIN  - The error score bin (defulat 4 bins)
-        COVARIATE       - Genomic Context (Context) or Read Cycle Bin (Cycle)
+    CALCULATION -   Option I) QltyErrAvg for QError Average per ReadGroup  
+                    Option II) FreqInRG for COV Frequency per ReadGroup
+
+    COV_VALUE   -   Option I) Genomic context of the error (i.e "AAAA")  
+                    Option II) Read Cycle Bin which corrosponds to a position range on the read
+
+    Q_SCORE_BIN -   The Sequencing QScore bin (the defulat is 4 bins)
+
+    COVARIATE -     Option I) Genomic Context (Context) 
+                    Option II) Read Cycle Bin (Cycle)
 **COMMENTS:**
-* The rows number of the profile depends on user-defined arguments and the GATKReport configuration. It means that br_stat_profiling of GATKReports produced by uniform GATK BaseRecalibrator confiuration will generate uniform profiles in size. If for example in a GATKReport, the context composition of ReadGroup A differs from ReadGroup B, br_stat_profiler **adds the missing values** as rows to the profile (with None value) so that the profile size remains identical.
+* The rows number of the profile depends on (1) the user-defined arguments and (2) the GATKReport configuration. It means that br_stat_profiling of GATKReports produced by uniform GATK BaseRecalibrator confiuration will generate uniform profiles in size and therefore **comparable**. If for example, in a GATKReport, the context composition of ReadGroup A differs from ReadGroup B, br_stat_profiler **completes all the missing values** to the profile (with None value) so that the profile size of ReadGroups A and B remains identical.
   
 * Missing values representation is user-defined (default = NaN) values and may be removed/imputed downstream
 
@@ -82,4 +86,4 @@ QltyErrAvg:AAAC:0:Context  -0.898580
 ## Credits<a name="credits"></a>
 To be completed 
 ## Contact<a name="contact"></a>
-To be completed 
+ido.carm@gmail.com
