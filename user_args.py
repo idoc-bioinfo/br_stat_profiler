@@ -41,8 +41,8 @@ class UARGS:
     SCORE_BINS_COUNT    =   "scr_bin_count"
     MIN_SCORE           =   "min_score"
     MIN_ERR_OBSRV       =   "min_err_observed"
-    NUMERIC_ERR_MODE    =  "numeric_err_mode"
-    RELU_MODE           =   "ReLU"
+    NUMERIC_QERR_MODE   =  "numeric_qerr_mode"
+    NO_RELU             =   "no_ReLU"
     CYC_BINS_COUNT      =   "cyc_bin_count"
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
@@ -95,20 +95,20 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-e',
         ArgPropKey.LONG_FLAG:'--' + UARGS.MIN_ERR_OBSRV,
     },
-    UARGS.NUMERIC_ERR_MODE: {
+    UARGS.NUMERIC_QERR_MODE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
         ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
         ArgPropKey.SHORT_FLAG:  '-num',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_ERR_MODE,
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.RELU_MODE: {
-        ArgPropKey.DEFAULT:     True,
+    UARGS.NO_RELU: {
+        ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
         ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
-        ArgPropKey.SHORT_FLAG:  '-ReLU',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.RELU_MODE,
+        ArgPropKey.SHORT_FLAG:  '-nR',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
         ArgPropKey.ACTION:      'store_true',
     },
     UARGS.SCORE_BINS_COUNT: {

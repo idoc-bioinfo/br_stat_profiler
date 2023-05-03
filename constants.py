@@ -48,7 +48,7 @@ class RT2_STAT:
     QLTY_ERR_AVG_COL = "QltyErrAvg"
     QLTY_ERR_RANGE_COL = "QltyErrRange"
     FREQ_IN_RG_COL = "FreqInRG"
-    FREQ_IN_RG_BIN_COL = "FreqInRG_ScrBin"
+    # FREQ_IN_RG_BIN_COL = "FreqInRG_ScrBin"
     RG_SCR_BINS_ITEM_N_COL = "RG_ScrBinItem_N"
     
     ID_COL = "ID"
@@ -59,7 +59,7 @@ class RT2_STAT:
 # Stat Auxiliary Table to calculate cycles statistics
 class CYC_RT2:
     CYC_COL = RC_TAB2.CYC_COV
-    CYC_BIN_COL = "CycleQunatile"
+    CYC_BIN_COL = "CycleBin"
 
 class CNTXT_RT2:
     CNTXT_COL = RC_TAB2.CNTXT_COV
