@@ -53,18 +53,13 @@ Straight forward, copy the 3 python files (br_stat_pfofiler.py, user_args.py, co
 ## Usage<a name="usage"></a>
 
 ```plaintext
+usage: br_stat_profiler.py [-h] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>] [-a <*.csv>] [-mq <int min=1 [1]>]
+                           [-e <int between 1 and 10 [4]>] [-num] [-nR] [-sb <int between 1 and 10 [4]>] [-cb <int between 1 and 15 [10]>]
+                           [-mic <int [1]>] [-mxc <int [150]>] [-nan <int [None]>] [-nZ] [-ct <cov_type>] [-pt <profile_type>]
 
-usage: br_stat_profiler.py  [-h] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>]
-                            [-a <*.csv>] [-mq <int min=1 [1]>] [-e <int between 1 and 10 [4]>]
-                            [-num] [-ReLU] [-sb <int between 1 and 10 [4]>]
-                            [-cb <int between 1 and 15 [10]>] [-mic <int [1]>]
-                            [-mxc <int [150]>] [-mv <int [None]>] [-nZ] [-ct <cov_type>]
-                            [-pt <profile_type>]
-
-br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be 
-compared/clustered downstream. It generates a separate profile for each ReadGroup in the stat report
-and tabulates them for easy analysis downstream. The profiles are streamed a CSV format to a file 
-or as output for further processing.
+br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. It generates
+a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or
+streamed as output for further processing.
 
 options:
   -h, --help            show this help message and exit
@@ -80,28 +75,26 @@ options:
                         Minimal Number of Errornous Observations for profiling (default=10)
   -num, --numeric_qerr_mode
                         The Phred errors are converted to numeric values. (default=False)
-  -nR,     --no_ReLU    NO ReLU filter (default=False)
+  -nR, --no_ReLU        Errors undergoes ReLU filter (default=False)
   -sb <int between 1 and 10 [4]>, --scr_bin_count <int between 1 and 10 [4]>
-                        # of bins of do divide the QualityScore values. The profiler averages the QError rate
-                        in each bin. (default=4)
+                        # of bins of do divide the QualityScore values (The profiler further averages the QError rate in each bin).
+                        (default=4)
   -cb <int between 1 and 15 [10]>, --cyc_bin_count <int between 1 and 15 [10]>
-                        The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments
-                        thus QEerror is averaged for each fragment. (default=10)
+                        The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments thus QEerror is averaged
+                        for each fragment. (default=10)
   -mic <int [1]>, --min_cyc <int [1]>
-                        In cycles profiling, first position along the read. Irrelevant for context profiling.
-                        (default=1)
+                        In cycles profiling, first position along the read. Irrelevant for context profiling. (default=1)
   -mxc <int [150]>, --max_cyc <int [150]>
-                        In cycles profiling, last position in the read. Irrelevant for context profiling.
-                        (default=150)
+                        In cycles profiling, last position in the read. Irrelevant for context profiling. (default=150)
   -nan <int [None]>, --nan_rep <int [None]>
                         NaN representation for missing values, may be removed/imputed downstream
   -nZ, --no_zscore      NO ZScoring the final profile (default=False)
   -ct <cov_type>, --cov_type <cov_type>
-                        Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle
-                        or both (context + cycle). options=['cntxt','cyc', 'cntxt_cyc'], (default=cntxt)
+                        Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or both (context + cycle).
+                        options=['cntxt', 'cyc', 'cntxt_cyc'], (default=cntxt)
   -pt <profile_type>, --profile_type <profile_type>
-                        Profile may include calculation of average QError and/or frequency per covariance
-                        (context or cycle). options=['err_mean', 'freq','err_mean_and_freq'], (default=err_mean_and_freq)
+                        Profile may include calculation of average QError and/or frequency per covariance (context or cycle).
+                        options=['err_mean', 'freq', 'err_mean_and_freq'], (default=err_mean_and_freq)
 ```
 
 ### **Input**
