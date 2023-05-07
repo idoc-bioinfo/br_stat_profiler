@@ -16,7 +16,7 @@ Profiler of GATK BaseRecalibrator reportss
 
 ## Preview<a name="preview"></a>
 
-**br_stat_profiler** profiles the GATKReport using two optional covariates types: (1) genomic context and (2) read cycle. The tool calculates for each covariates value the average QError (difference between Quality Score and the Actual score) and its Frequency.
+**br_stat_profiler** profiles the GATKReport using two optional covariates types: (1) genomic context and (2) read cycle. The tool calculates for each covariates value the weighted average QError (difference between Quality Score and the Actual score).
 
 Below is a simplified version of the profiling algorithm per sample (=ReadGroup) and per covariate (GenomicContext or ReadCycle). The detailed algorithm is a bit more complicated and involves additional binning steps and grouping by samples and bins.
 
