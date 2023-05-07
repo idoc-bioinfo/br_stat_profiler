@@ -150,7 +150,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE: int,
         ArgPropKey.HELP: 'NaN representation for missing values, may be removed/imputed downstream',
         ArgPropKey.METAVAR: '<int [None]>',
-        ArgPropKey.SHORT_FLAG: '-mv',
+        ArgPropKey.SHORT_FLAG: '-nan',
         ArgPropKey.LONG_FLAG: '--' + UARGS.NAN_REP,
     },
     UARGS.NO_ZSCORING: {
@@ -185,24 +185,40 @@ ARGS_PROPERTIES = {
 BQ_STAT_PROFILER_DESC = "br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \
     "It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output for further processing."
 
-def complements_info(args_properties):
+def complements_uargs_help_string(args_properties):  
+    """ add to the help string suffix with default values and choices if exists
+
+    Args:
+        args_properties (dict): user arguments
+
+    Returns:
+        dict: user arguments with added help strings
+    """    
+    
     for key, _ in args_properties.items():
-        default_val = args_properties[key][ArgPropKey.DEFAULT]
+        # default_val = args_properties[key][ArgPropKey.DEFAULT]
         choices = args_properties[key].get(ArgPropKey.CHOICES)
         current_help = args_properties[key][ArgPropKey.HELP]
-        
-        if default_val == None or isinstance(default_val, type(sys.stdin)):
-            continue
-        
+                       
         if choices:
             current_help += f' options={str(choices)},'
-        current_help += f"\n(default={args_properties[key][ArgPropKey.DEFAULT]})"
+        
+        if key == UARGS.INFILE:
+            default_string = "stdin"
+        elif key == UARGS.OUTFILE:
+            default_string = "stdout"
+        else:
+            default_string = args_properties[key][ArgPropKey.DEFAULT]
+            
+        # current_help += f"\n(default={args_properties[key][ArgPropKey.DEFAULT]})"
+        if default_string != None:
+            current_help += f"\n(default={default_string})"
         args_properties[key][ArgPropKey.HELP] = current_help
     
     return args_properties
         
         
-def complete_args_prop_info(args_properties):
+def complete_uargs_metavar_info(args_properties):
         
     ## substitute min max values in help string
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
@@ -219,9 +235,9 @@ def complete_args_prop_info(args_properties):
 
     return args_properties
 
-global_args_props = complete_args_prop_info(ARGS_PROPERTIES)
+global_args_props = complete_uargs_metavar_info(ARGS_PROPERTIES)
 
-global_args_props = complements_info(ARGS_PROPERTIES)
+global_args_props = complements_uargs_help_string(ARGS_PROPERTIES)
 
 def get_global_args_properties():
     return global_args_props
@@ -238,7 +254,7 @@ def parser_add_arg(parser, props):
         nargs   =   props.get(ArgPropKey.NARGS)
     )
 
-def parser_add_bool(parser,props):
+def parser_add_bool_arg(parser,props):
     parser.add_argument(props.get(ArgPropKey.SHORT_FLAG), 
         props[ArgPropKey.LONG_FLAG],
         default =   props.get(ArgPropKey.DEFAULT),
@@ -246,30 +262,40 @@ def parser_add_bool(parser,props):
         action  =   props.get(ArgPropKey.ACTION),
     )
 
+def check_int_scope(arg_props, parser_args):
+    """verify that the int values satisfyies the predefined scope limits 
 
-def check_int_scope(arg_props, args):
+    Args:
+        arg_props (dict): initial arguments (include scope data) 
+        parser args (dict): arguments loaded to the parser
+
+    Raises:
+        argparse.ArgumentTypeError: out of scope
+        argparse.ArgumentTypeError: below min 
+        argparse.ArgumentTypeError: above max
+    """ 
     for key, prop in arg_props.items():
         if ArgPropKey.MIN in prop and ArgPropKey.MAX in prop:
-            arg_value = getattr(args, key)
+            arg_value = getattr(parser_args, key)
             if arg_value < prop[ArgPropKey.MIN] or arg_value > prop[ArgPropKey.MAX]:
                 raise argparse.ArgumentTypeError(f"{key} must be between {prop[ArgPropKey.MIN]} and {prop[ArgPropKey.MAX]}")
         
         if ArgPropKey.MIN in prop:  # only min value was given
-            arg_value = getattr(args, key)
+            arg_value = getattr(parser_args, key)
             if arg_value < prop[ArgPropKey.MIN]:
                 raise argparse.ArgumentTypeError(f"{key} must be above {prop[ArgPropKey.MIN]}")
         
         if ArgPropKey.MAX in prop:  # only max value was given
-            arg_value = getattr(args, key)
+            arg_value = getattr(parser_args, key)
             if arg_value > prop[ArgPropKey.MAX]:
                 raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")        
     return
 
-def check_csv_exists(filename):
-    if not os.path.exists(filename): # older format missing
+def check_csv_file_exists(filename):
+    if not os.path.exists(filename): # missing filename
         raise argparse.ArgumentError(None, "concat_older=True but older profile is missing")
     # check file in csv format
-    if os.path.splitext(filename)[1].lower() != '.csv':
+    if os.path.splitext(filename)[1].lower() != '.csv': # wrong format
         raise argparse.ArgumentError(None, f"older profile {filename} is not in .csv format")     
     return
 
@@ -277,10 +303,10 @@ def verify_outfile_csv(args):
     filename = args.outfile.name
     if filename  == 'stdout' or filename == '<stdout>':
         return
-    _, ext = os.path.splitext(filename)
-    if ext != ".csv":
+    _, ext = os.path.splitext(filename) # extract extension string
+    if ext != ".csv":  # add csv extension and open file 
         args.outfile = open(f"{filename}.csv", "x")
-        os.remove(filename)
+        os.remove(filename)  # remove file without ext (opened by the parser automatically)
     return
 
 def check_min_max_cycle(args):
@@ -288,16 +314,16 @@ def check_min_max_cycle(args):
         raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). It cannont be divided into {args.cyc_bin_count} bins") 
     return
 
-def check_args(args):
+def check_args(parser_args):
     args_props= get_global_args_properties()
-    adict = vars(args)
-    # check arguments 
-    check_int_scope(args_props, args)
-    verify_outfile_csv(args)
-    if args.concat_older: 
-        check_csv_exists(args.concat_older)
-    check_min_max_cycle(args)
-    return adict
+    parser_dict = vars(parser_args) # parser 
+    # preform checks 
+    check_int_scope(args_props, parser_args)
+    verify_outfile_csv(parser_args)
+    if parser_args.concat_older: 
+        check_csv_file_exists(parser_args.concat_older)
+    check_min_max_cycle(parser_args)
+    return parser_dict
 
 # returns loaded parser
 def load_parser():
@@ -306,7 +332,7 @@ def load_parser():
     for _, props in args_props.items():
         store_true = (props.get(ArgPropKey.ACTION) == 'store_true')
         if store_true:
-            parser_add_bool(parser, props)    
+            parser_add_bool_arg(parser, props)    
         else:
             parser_add_arg(parser, props)
     return parser

@@ -131,11 +131,12 @@ def preprocess_rt1_df(GATK_Tables, args_dict):
     # get a copy of RecalTable1
     rt1_df = GATK_Tables[RC_TAB1.NAME].copy()
     # filter the scores above MIN_SCORE
-    rt1_df = rt1_df[rt1_df[RC_TAB1.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE]]
-    # Add columns bin the scores in each ReadGrpou and add a column with the score bins 
-    rt1_df[RC_TAB1.RG_SCORE_BIN_COL] = rt1_df.groupby(
-        RC_TAB1.RG_COL, group_keys=False)[RC_TAB1.QLTY_SCORE_COL] \
-        .apply(lambda x: pd.Series(divide_into_ranges(lst=x, K=args_dict[UARGS.SCORE_BINS_COUNT])))
+    rt1_df = rt1_df[
+        (rt1_df[RC_TAB1.EVNT_TYPE_COL] == RC_TAB1.MM_EVNT) & \
+        (rt1_df[RC_TAB1.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE])
+        ]
+    # # Add columns bin the scores in each ReadGrpou and add a column with the score bins 
+    rt1_df[RC_TAB1.RG_SCORE_BIN_COL] = divide_into_ranges(rt1_df[RC_TAB1.QLTY_SCORE_COL], K=args_dict[UARGS.SCORE_BINS_COUNT])
 
     return rt1_df
 
@@ -216,9 +217,9 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL, cov_type]
         )[RC_TAB2.QLTY_ERR_COL].agg(
             [(RT2_STAT.QLTY_ERR_AVG_COL,'mean'),   
-              (RT2_STAT.RG_SCR_BINS_ITEM_N_COL,'size')]
+              (RT2_STAT.RG_SCR_BINS_N_COV_COL,'size')]
             ).reset_index()
-
+    
     # groupby ReadGroup and calculate groups sizes
     rg_group_sizes = item_rt2_df.groupby(RC_TAB2.RG_COL).size().\
         reset_index().rename(columns={0:RT2_STAT.RG_N_COL})
@@ -235,10 +236,10 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
 
     # calculate Frequency by ReadGroup
     item_rt2_stat_df[RT2_STAT.FREQ_IN_RG_COL] = \
-        item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_ITEM_N_COL] / item_rt2_stat_df[RT2_STAT.RG_N_COL]
+        item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_N_COV_COL] / item_rt2_stat_df[RT2_STAT.RG_N_COL]
     # calculate Frequency by both ReadGroup and ReadGroupScoreBins (currently unused for the profile)
     # item_rt2_stat_df[RT2_STAT.FREQ_IN_RG_BIN_COL] = \
-    #     item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_ITEM_N_COL] / item_rt2_stat_df[RT2_STAT.RG_SCR_BIN_N_COL]
+    #     item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_N_COV_COL] / item_rt2_stat_df[RT2_STAT.RG_SCR_BIN_N_COL]
 
     return item_rt2_stat_df
 
@@ -529,7 +530,6 @@ def save_profile(new_profile, args_dict):
         ValueError: assert the that the older provided profile and the current profile matches (and can be concatenated)
         ValueError: "same same"
     """    
-    
     result_profile = pd.DataFrame()
     
     if args_dict[UARGS.CONCAT_OLDER]: # older profile file was provided by the user
@@ -540,9 +540,10 @@ def save_profile(new_profile, args_dict):
         
         if set(new_profile.columns).intersection(set(old_profile.columns)):  # overlapping colnames 
             raise ValueError(f'Mutual columns titles found between new profile and {old_profile_name}')
-    
-        result_profile = pd.concat([old_profile,new_profile], axis=1)    
-    else:
+        
+        # concatenation if preformed horizontaly
+        result_profile = pd.concat([old_profile,new_profile], axis=1)     
+    else:  # no older profile provided
         result_profile = new_profile
     
     f = args_dict[UARGS.OUTFILE] # get the opened output stream (file or stdout)
