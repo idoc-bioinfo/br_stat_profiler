@@ -48,9 +48,10 @@ class UARGS:
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
     NO_ZSCORING         =   "no_zscore" # True
-    PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
+    # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
-
+    ARITHMETIC_MEAN     =   "arithmetic_mean"
+    
 class PRVT_ARG:      # private arguments
     MM_CNTXT_SIZE       =   "mm_cntxt_size"   # argument if filled duting  analysis
 
@@ -156,7 +157,7 @@ ARGS_PROPERTIES = {
     UARGS.NO_ZSCORING: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'NO ZScoring the final profile',
+        ArgPropKey.HELP:        'Omit ZScoring in the final profile',
         ArgPropKey.SHORT_FLAG:  '-nZ',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_ZSCORING,
         ArgPropKey.ACTION:      'store_true',
@@ -170,16 +171,25 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-ct',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
     },
-    UARGS.PROFILE_TYPE: {   # outfile 
-        ArgPropKey.DEFAULT:     "err_mean_and_freq",
-        ArgPropKey.TYPE:        str,
-        ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
-        ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
-        ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
-        ArgPropKey.SHORT_FLAG:  '-pt',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
+    # UARGS.PROFILE_TYPE: {   # outfile 
+    #     ArgPropKey.DEFAULT:     "err_mean_and_freq",
+    #     ArgPropKey.TYPE:        str,
+    #     ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
+    #     ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
+    #     ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
+    #     ArgPropKey.SHORT_FLAG:  '-pt',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
+    # },
+    UARGS.ARITHMETIC_MEAN: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
+        ArgPropKey.SHORT_FLAG:  '-aM',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
+        ArgPropKey.ACTION:      'store_true',
     },
 }
+
 
 
 BQ_STAT_PROFILER_DESC = "br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \

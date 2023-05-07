@@ -163,7 +163,7 @@ def preprocess_rc_tab2_df(GATK_Tables, rt1_df, args_dict):
         (rt2_df[RC_TAB2.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE])  & \
         (rt2_df[RC_TAB2.ERR_OBSERV_COL] >= args_dict[UARGS.MIN_ERR_OBSRV])
         ]
-        
+    
     # calculating the QError (quality_score - empyrical quality)
     rt2_df[RC_TAB2.QLTY_ERR_COL] = pd.to_numeric(rt2_df[RC_TAB2.EMP_QLTY_COL]) - \
         pd.to_numeric(rt2_df[RC_TAB2.QLTY_SCORE_COL])
@@ -201,15 +201,15 @@ def filter_cov_type(rt2_df, cov_type):
 # calculates statistics of ScoreQltyError average and group frequency (see below)
 def calculate_stat_rt2_df(item_rt2_df, cov_type):
     """Calculate statistics table per a covariate per ReadGroup per ScoreBin:
-        - mean QError
-        - Frequency within a ReadGroup or both ReadGroup and ScoreBin (currently not used in the profile)
+        - QError arithmetic mean 
+        - QError weighted mean within ReadGroup and ScoreBin
 
     Args:
         item_rt2_df (pd.Dataframe): Processed RecalTable2
         cov_type (str): the covariate type name
 
     Returns:
-        pd.Dataframe: Table with mean and freq statistics 
+        pd.Dataframe: Table with arithmethic and weighted mean statistics 
     """
     # Groupby ReadGroup, READ_GROUP_SCORE_BIN  and a coveriat
     # For each subgroup calculate AVERAGE_quality_err and N
@@ -217,29 +217,20 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL, cov_type]
         )[RC_TAB2.QLTY_ERR_COL].agg(
             [(RT2_STAT.QLTY_ERR_AVG_COL,'mean'),   
-              (RT2_STAT.RG_SCR_BINS_N_COV_COL,'size')]
+              (RT2_STAT.RG_SCR_BINS_COV_N_COL,'size')]
             ).reset_index()
     
-    # groupby ReadGroup and calculate groups sizes
-    rg_group_sizes = item_rt2_df.groupby(RC_TAB2.RG_COL).size().\
-        reset_index().rename(columns={0:RT2_STAT.RG_N_COL})
     # groupby both ReadGroup and ReadGroupScoreBins and calculate groups sizes  (currently unused in the profile)
-    # rg_qtl_group_sizes = item_rt2_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).size().\
-    #     reset_index().rename(columns={0:RT2_STAT.RG_SCR_BIN_N_COL})
+    rg_bin_group_sizes = item_rt2_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).size().\
+        reset_index().rename(columns={0:RT2_STAT.RG_SCR_BIN_N_COL})
 
     # add the groups sizes as columns to the RecalTable  
-    item_rt2_stat_df = pd.merge(item_rt2_stat_df, rg_group_sizes, on=RC_TAB2.RG_COL).set_index(item_rt2_stat_df.index)  # row index unchanged
-    # item_rt2_stat_df = pd.merge(item_rt2_stat_df, rg_group_sizes, on=RC_TAB2.RG_COL) \
-    #     .merge(rg_qtl_group_sizes, on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).\
-    #         set_index(item_rt2_stat_df.index)  # row index unchanged
+    item_rt2_stat_df = pd.merge(item_rt2_stat_df, rg_bin_group_sizes, on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).\
+            set_index(item_rt2_stat_df.index)  # row index unchanged
 
-
-    # calculate Frequency by ReadGroup
-    item_rt2_stat_df[RT2_STAT.FREQ_IN_RG_COL] = \
-        item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_N_COV_COL] / item_rt2_stat_df[RT2_STAT.RG_N_COL]
-    # calculate Frequency by both ReadGroup and ReadGroupScoreBins (currently unused for the profile)
-    # item_rt2_stat_df[RT2_STAT.FREQ_IN_RG_BIN_COL] = \
-    #     item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_N_COV_COL] / item_rt2_stat_df[RT2_STAT.RG_SCR_BIN_N_COL]
+    # calculated of weighted average of a cov QError (per Readgroup+Bin)
+    item_rt2_stat_df[RT2_STAT.QLTY_ERR_W_AVG_COL] = item_rt2_stat_df[RT2_STAT.QLTY_ERR_AVG_COL] * \
+        (item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_COV_N_COL] / item_rt2_stat_df[RT2_STAT.RG_SCR_BIN_N_COL])
 
     return item_rt2_stat_df
 
@@ -439,11 +430,9 @@ def extract_profiles_from_stat_df(stat_df, read_group, stat_type, idx_col, add_i
 
 def extract_profile(stat_df, args_dict):
     """Extracts zscored profiles form the stat table.
-    The profile type is indicated in the user arguments dictionary (default="err_mean_and_freq")
-    from the following choices ["err_mean", "freq" , "err_mean_and_freq"]
-    By default both types are specified and the profile of each are concatenated together one after the other
-    
-    The profile is zscored by defualt (unless --no-zscore flag is specified)
+    By default, the profile is ZSCORED WEIGHTED MEAN of q_err value (per ReadGroup + Bin).
+    The user may choose to use arithmetic mean ( --arithmetic_mean). 
+    The zscoreing can also be excluded (by --no-zscore flag)
     
     Args:
         stat_df (pd.Dataframe): statistics table ready for profile extaction
@@ -453,37 +442,24 @@ def extract_profile(stat_df, args_dict):
         pd.Dataframe: zscored profile
     """    
     scaler          = StandardScaler()
-    err_profile     = pd.DataFrame()
-    freq_profile    = pd.DataFrame()
+    q_err_profile   = pd.DataFrame()
+    target_colname  = ""
     
-    if args_dict[UARGS.PROFILE_TYPE] == "err_mean" or args_dict[UARGS.PROFILE_TYPE] == "err_mean_and_freq":
-        err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
-                                       RT2_STAT.QLTY_ERR_AVG_COL, RT2_STAT.ID_COL)
+    if args_dict[UARGS.ARITHMETIC_MEAN]: # False by default 
+        target_colname  = RT2_STAT.QLTY_ERR_AVG_COL
+    else:
+        target_colname  = RT2_STAT.QLTY_ERR_W_AVG_COL 
+    
+    q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
+                                       target_colname, RT2_STAT.ID_COL)
         
-        if not args_dict[UARGS.NO_ZSCORING]:
-            err_profile = pd.DataFrame(scaler.fit_transform(err_profile),
-                                           columns=err_profile.columns, index=err_profile.index)
-        if args_dict[UARGS.NAN_REP]: # nan_rep != None
-            err_profile = err_profile.fillna(args_dict[UARGS.NAN_REP])
+    if not args_dict[UARGS.NO_ZSCORING]: # Default !!!
+        q_err_profile = pd.DataFrame(scaler.fit_transform(q_err_profile),
+                                    columns=q_err_profile.columns, index=q_err_profile.index)
+    if args_dict[UARGS.NAN_REP]: # nan_rep == None by default
+        q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
     
-    if args_dict[UARGS.PROFILE_TYPE] == "err_mean":
-        return err_profile
-
-    if args_dict[UARGS.PROFILE_TYPE] == "freq" or args_dict[UARGS.PROFILE_TYPE] == "err_mean_and_freq":
-        freq_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
-                                        RT2_STAT.FREQ_IN_RG_COL, RT2_STAT.ID_COL)
-        
-        if not args_dict[UARGS.NO_ZSCORING]:
-            freq_profile = pd.DataFrame(scaler.fit_transform(freq_profile),
-                                         columns=freq_profile.columns, index=freq_profile.index)
-        if args_dict[UARGS.NAN_REP]: # nan_rep != None
-            freq_profile = freq_profile.fillna(args_dict[UARGS.NAN_REP])
-
-    if args_dict[UARGS.PROFILE_TYPE] == "freq":
-        return freq_profile
-    
-    # args_dict[UARGS.PROFILE_TYPE] == "err_mean_and_freq"
-    return pd.concat([err_profile, freq_profile])
+    return q_err_profile
 
 
 def profile_rt(pre_stat_df, args_dict):
@@ -554,22 +530,23 @@ def save_profile(new_profile, args_dict):
 if __name__ == "__main__":
     parser = load_parser()
     # testing  code
-    # =================================================================
+    # ################### TESTING ############################
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
     # REC_TAB_FULL_PATH = \
     #     RECAL_TABLE_DIR + "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -pt freq -ct cyc"
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -ct cyc"
     # args = parser.parse_args(cmd.split())
-    # # =================================================================  
-    # production code
+    # ################### PRODUCTTION ############################
     args = parser.parse_args()
-    # ===============================================
+    #============================================================
     
     adict = check_args(args) 
     # [print(key,":",val) for key,val in adict.items()] 
     rt2_pre_stat_df = preprocess_recal_table(adict)
     profile = profile_rt(rt2_pre_stat_df, adict)
     save_profile(profile, adict)
+    
+    # ################### TESTING ############################
     # print(profile.head())
     # # print(type(adict[UARGS.OUTFILE]))
     # # create new dataframe
