@@ -26,13 +26,13 @@ Simplified algorithm:
 2. Calculate QError as ReLU(QualityScore - ActualScore) for each covariate.
 3. Prepare an auxiliary stat table *auxiliary_stat_df* as follows:
    1. Define *covs_set* as the covariate set found in the filtered GATKReport
-   2. For each covariate in *covs_set*, calculate (1) Average *QError* and (2) Frequency (# of occurences/total occurences)
+   2. For each covariate in *covs_set*, calculate (1) Weighted or (2) Arithmetic Average *QError* 
    3. Prepare a list with the complete covariate space (e.g, for GContext of size 4, all the 256 possible 4-mers)
    4. Find covariates that are missing from *covs_set* and found in the complete covariate space (*covs_set* complement set) termed "the missing covariates".
-   5. Add the missing covariates to *auxiliray_stat_df* and substitute *None* value for their Average *QError* and Freq.
-   6. ZScore the values of each statistics (Average *QError* and the Freq) seperatly.
+   5. Add the missing covariates to *auxiliray_stat_df* and substitute *None* value for their statistics
+   6. ZScore the statistics values.
    7. Sort the table by the covariate (for uniformity)
-4. Extract the profile for the Average_QError_, Freq or both
+4. Extract the profile for eigher the Weighted (default) or Arithmetic Average QError
 
 ### COMMENTS:
 
@@ -119,8 +119,8 @@ QltyErrAvg:AAAC:0:Context  -0.898580
 ##### **\< CALCULATION   :   COV_VALUE   :   Q_SCORE_BIN   :   COVARIATE >**
 
 ```
-CALCULATION -   Option I) QltyErrAvg for QError Average per ReadGroup
-                Option II) FreqInRG for COV Frequency per ReadGroup
+CALCULATION -   Option I) QErrWeightedAvg for QError Weighted Average per ReadGroup & ScoreBin
+                Option II) QErrAvg for QError Arithmetic Average per ReadGroup & ScoreBin
 
 COV_VALUE   -   Option I) Genomic context of the error (i.e "AAAA")
                 Option II) Read Cycle Bin which corrosponds to a position range on the read
