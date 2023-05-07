@@ -52,8 +52,10 @@ Straight forward, copy the 3 python files (br_stat_pfofiler.py, user_args.py, co
 
 ## Usage<a name="usage"></a>
 
-```{.code-block width="80"}
-br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output for further processing.
+```plaintext
+br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. 
+It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. 
+The profiles can be saved in a CSV format or streamed as output for further processing.
 
 options:
   -h, --help            show this help message and exit
