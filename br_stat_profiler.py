@@ -168,9 +168,9 @@ def preprocess_rc_tab2_df(GATK_Tables, rt1_df, args_dict):
     rt2_df[RC_TAB2.QLTY_ERR_COL] = pd.to_numeric(rt2_df[RC_TAB2.EMP_QLTY_COL]) - \
         pd.to_numeric(rt2_df[RC_TAB2.QLTY_SCORE_COL])
 
-    # calculate numeric QError instead of Phread (default False)
+    # calculate numeric QError (Ratio) instead of Phread (default False)
     if args_dict[UARGS.NUMERIC_QERR_MODE]:
-        rt2_df[RC_TAB2.QLTY_ERR_COL] = rt2_df[RC_TAB2.QLTY_ERR_COL].apply(lambda x: pow(10,x/10))
+        rt2_df[RC_TAB2.QLTY_ERR_COL] = rt2_df[RC_TAB2.QLTY_ERR_COL].apply(lambda x: pow(10,x/10))   
     
     # apply ReLU function to the errors unless no_relu (default False)
     if not args_dict[UARGS.NO_RELU]:

@@ -48,7 +48,7 @@ Simplified algorithm:
 
 ## Installation<a name="installation"></a>
 
-Straight forward, copy the 3 python files (br_stat_pfofiler.py, user_args.py, constants.py} under the same directory
+Straight forward, copy the 3 python files {br_stat_pfofiler.py, user_args.py, constants.py} under the same directory
 
 ## Usage<a name="usage"></a>
 
@@ -106,12 +106,12 @@ a CSV format file (or stream)
 **Example**: profile of GATKReport with a single ReadGroup (HVWKMCCXY)
 
 ```
-                           HVWKMCCXY
-QltyErrAvg:AAAA:0:Context  -1.041131
-QltyErrAvg:AAAA:1:Context  -0.841560
-QltyErrAvg:AAAA:2:Context  -1.041131
-QltyErrAvg:AAAA:3:Context   0.705112
-QltyErrAvg:AAAC:0:Context  -0.898580
+                                 HVWKMCCXY
+QErrWeightedAvg:AAAA:0:Context	-1.009847
+QErrWeightedAvg:AAAA:1:Context	-0.862207
+QErrWeightedAvg:AAAA:2:Context	-1.009847
+QErrWeightedAvg:AAAA:3:Context	0.950003
+QErrWeightedAvg:AAAC:0:Context	-0.806285
 ```
 
 **row_index** is comprised of 4 tokens joined with ":" as seperator:
@@ -119,15 +119,15 @@ QltyErrAvg:AAAC:0:Context  -0.898580
 ##### **\< CALCULATION   :   COV_VALUE   :   Q_SCORE_BIN   :   COVARIATE >**
 
 ```
-CALCULATION -   Option I) QErrWeightedAvg for QError Weighted Average per ReadGroup & ScoreBin
+CALCULATION -   Option  I) QErrWeightedAvg for QError Weighted Average per ReadGroup & ScoreBin
                 Option II) QErrAvg for QError Arithmetic Average per ReadGroup & ScoreBin
 
-COV_VALUE   -   Option I) Genomic context of the error (i.e "AAAA")
+COV_VALUE   -   Option  I) Genomic context of the error (i.e "AAAA")
                 Option II) Read Cycle Bin which corrosponds to a position range on the read
 
 Q_SCORE_BIN -   The Sequencing QScore bin (the defulat is 4 bins)
 
-COVARIATE -     Option I) Genomic Context (Context)
+COVARIATE -     Option  I) Genomic Context (Context)
                 Option II) Read Cycle Bin (Cycle)
 ```
 
