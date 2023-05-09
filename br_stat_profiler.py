@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from constants import RT_HDR, ARG_TAB, RC_TAB1, RC_TAB2, CYC_RT2, RT2_STAT
 # from usr_props import UserProperties
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
+from wobble_utils import get_wobbled_k_mers, add_wobble_data
 
 def create_dtype_dict(formats_list ):
     """ Generate dictionary to convert printing types format ("%s, %d") into python dtypes
@@ -209,12 +210,12 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
                                     weights=x[RC_TAB2.OBS_COL].astype(int)))\
                                         .reset_index().rename(
                                             columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
-                                        
+    # back to phred value                                        
     grp_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
         grp_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(lambda x: -10 * math.log10(x))
 
     # summerize the observations and errors
-    items_sum_obs_errs = item_rt2_df.groupby(
+    grp_emp_score_df = item_rt2_df.groupby(
         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL, cov_type]) \
             [[RC_TAB2.OBS_COL, RC_TAB2.ERR_OBSERV_COL]]\
             .sum() \
@@ -223,12 +224,12 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
                                     .reset_index()
 
     # calculate empyrical collective error (phred formula)
-    items_sum_obs_errs[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
-        -10 * np.log10(items_sum_obs_errs[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-            / items_sum_obs_errs[RT2_STAT.BIN_OBS_SUM_COL])
+    grp_emp_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+        -10 * np.log10(grp_emp_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
+            / grp_emp_score_df[RT2_STAT.BIN_OBS_SUM_COL])
 
     # merge data into a new stat dataframe            
-    stat_df = pd.merge(grp_score_df, items_sum_obs_errs,
+    stat_df = pd.merge(grp_score_df, grp_emp_score_df,
                     on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])
 
     # Calculate QError
@@ -325,6 +326,7 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
 
 
 
+
 def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_COV or RC_TAB2.CNTXT_COV
     """Preparation a statistics table before profile extraction
 
@@ -336,12 +338,12 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
     Returns:
         pd.Dataframe: stat table for profile extraction
     """
+    
     full_library = []
     target_colname = cov_type
     mode_rt2_df = filter_cov_type(rt2_df, cov_type)
-
         
-    if cov_type == RC_TAB2.CYC_COV: 
+    if cov_type == RC_TAB2.CYC_COV:   # cycles statistics
         # generates colletion of all the optional cycles (abs)
         cyc_range_abs = list(range(args_dict[UARGS.MIN_CYC],args_dict[UARGS.MAX_CYC]+1))
         # generate collectioin of all the optional bins (both negative and positive excluding 0)
@@ -351,20 +353,74 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
         
         mode_rt2_df =  add_cyc_bins(mode_rt2_df,cyc_range_abs, args_dict)
         target_colname = CYC_RT2.CYC_BIN_COL
-    elif cov_type == RC_TAB2.CNTXT_COV: 
-        # generation of a complete set of contexts 
-        combinations = list(itertools.product(['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
-        # joining all the letters combinations into strings
-        full_library = [''.join(comb) for comb in combinations]
+    
+    elif cov_type == RC_TAB2.CNTXT_COV:  # context statistics
+        if args_dict[UARGS.NO_WOBBLE]:
+            # generate of full k_mers list without woobles position
+            combinations = list(itertools.product(['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
+            full_library = [''.join(comb) for comb in combinations]
+        else:  # with woble
+            full_library = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict[UARGS.MAX_WOBBLE_OCC], only_with_wob=False)
 
+    # calculate statistics without wooble 
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
-    # removing small value (noise?)
+    
+    # add wooble position statistics if needed
+    if not args_dict[UARGS.NO_WOBBLE]:   # preform wobble
+        rt2_stat_df = add_wobble_data(rt2_stat_df, args_dict)
+    
+    # remove statistics values below the cutoff (remove noise?)
     rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
 
+    # complete the missing set of data (as None)
     rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
     rt2_stat_df = add_id_column(rt2_stat_df)
-    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True) # uniform order before profile extraction
+    # generate uniform order before profile extraction
+    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True) 
+    
     return rt2_stat_df
+
+# def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_COV or RC_TAB2.CNTXT_COV
+#     """Preparation a statistics table before profile extraction
+
+#     Args:
+#         rt2_df (pd.Dataframe): preprocessed RecallTable 2 (with ScoreBins)
+#         cov_type (str): the covariate type name
+#         args_dict (dict): user_args
+    
+#     Returns:
+#         pd.Dataframe: stat table for profile extraction
+#     """
+#     full_library = []
+#     target_colname = cov_type
+#     mode_rt2_df = filter_cov_type(rt2_df, cov_type)
+
+        
+#     if cov_type == RC_TAB2.CYC_COV: 
+#         # generates colletion of all the optional cycles (abs)
+#         cyc_range_abs = list(range(args_dict[UARGS.MIN_CYC],args_dict[UARGS.MAX_CYC]+1))
+#         # generate collectioin of all the optional bins (both negative and positive excluding 0)
+#         cycles_quantiles_abs = list(set(pd.qcut(cyc_range_abs,
+#                                                 q=args_dict[UARGS.CYC_BINS_COUNT],labels=False) + 1))
+#         full_library = sorted([-x for x in cycles_quantiles_abs] + cycles_quantiles_abs) 
+        
+#         mode_rt2_df =  add_cyc_bins(mode_rt2_df,cyc_range_abs, args_dict)
+#         target_colname = CYC_RT2.CYC_BIN_COL
+#     elif cov_type == RC_TAB2.CNTXT_COV: 
+#         # generation of a complete set of contexts 
+#         combinations = list(itertools.product(['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
+#         # joining all the letters combinations into strings
+#         full_library = [''.join(comb) for comb in combinations]
+
+#     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
+#     # removing small value (noise?)
+    
+#     rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
+
+#     rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
+#     rt2_stat_df = add_id_column(rt2_stat_df)
+#     rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True) # uniform order before profile extraction
+#     return rt2_stat_df
 
 def _preprocess_recal_table(filename_full_path, args_dict):
     """preprocess GATKReport:  

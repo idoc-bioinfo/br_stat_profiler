@@ -65,9 +65,8 @@ class RT2_STAT:
     # RG_SCR_BIN_N_COL            = "RG_ScrBin_N"      
     # QLTY_ERR_W_AVG_COL          = "QErrWeightedAvg"
     ID_COL                      = "ID"
-    
-    ID_DELIM                = ":"
-    COV_TYPE_COL_IDX        = 2
+    ID_DELIM                    = ":"
+    COV_TYPE_COL_IDX            = 2
     
     # FREQ_IN_RG_COL        = "FreqInRG"            deprecated   
     # FREQ_IN_RG_BIN_COL    = "FreqInRG_ScrBin"     deprecated

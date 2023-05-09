@@ -52,7 +52,9 @@ class UARGS:
     # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
     # ARITHMETIC_MEAN     =   "arithmetic_mean"   # deprecated
-    QERR_CUTOFF         = "qerr_cutoff"
+    QERR_CUTOFF         =   "qerr_cutoff"
+    MAX_WOBBLE_OCC      =   "max_wobble_occurrences"
+    NO_WOBBLE           =   "no_wobble"
     
        
 class PRVT_ARG:      # private arguments
@@ -150,10 +152,10 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_CYC,
     },
     UARGS.NAN_REP: {
-        ArgPropKey.DEFAULT: 0,
-        ArgPropKey.TYPE: int,
+        ArgPropKey.DEFAULT:     0,
+        ArgPropKey.TYPE:        float,
         ArgPropKey.HELP:        'NaN representation for missing/cutoffed values, may be removed/imputed downstream',
-        ArgPropKey.METAVAR:     '<int [0]>',
+        ArgPropKey.METAVAR:     '<float [0]>',
         ArgPropKey.SHORT_FLAG:  '-nan',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NAN_REP,
     },
@@ -203,10 +205,28 @@ ARGS_PROPERTIES = {
         ArgPropKey.DEFAULT: 2,
         ArgPropKey.TYPE: float,
         # ArgPropKey.MIN: -10,
-        ArgPropKey.HELP: 'Cutoff for Qerror',
-        ArgPropKey.SHORT_FLAG: '-co',
-        ArgPropKey.LONG_FLAG: '--' + UARGS.QERR_CUTOFF,
+        ArgPropKey.HELP:        'Cutoff for Qerror (for removal of an hypothetical noise)',
+        ArgPropKey.SHORT_FLAG:  '-co',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.QERR_CUTOFF,
         ArgPropKey.METAVAR:     '<' + 'float [2]' + '>',
+    },
+    UARGS.NO_WOBBLE: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Do not calculate statistics for k-mers with wobble position (N)',
+        ArgPropKey.SHORT_FLAG:  '-nW',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_WOBBLE,
+        ArgPropKey.ACTION:      'store_true',
+    },
+    
+    UARGS.MAX_WOBBLE_OCC: {
+        ArgPropKey.DEFAULT:     2,
+        ArgPropKey.TYPE:        int,
+        ArgPropKey.MIN:         1,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions (N) in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-mW',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOBBLE_OCC,
+        ArgPropKey.METAVAR:     '<' + 'int [2]' + '>',
     },
 }
 
@@ -250,7 +270,6 @@ def complements_uargs_help_string(args_properties):
         
 def complete_uargs_metavar_info(args_properties):
         
-    ## substitute min max values in help string
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
         f'<int min={args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]} [{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
 
@@ -262,6 +281,9 @@ def complete_uargs_metavar_info(args_properties):
 
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
         f'<int between {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+    
+    args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.METAVAR] = \
+        f'<int min={args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.MIN]} [{args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.DEFAULT]}]>'
 
     return args_properties
 
