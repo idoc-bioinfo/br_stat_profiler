@@ -36,11 +36,13 @@ class RC_TAB2:
     COV_NAME_COL        = "CovariateName"
     EVNT_TYPE_COL       = "EventType"
     EMP_QLTY_COL        = "EmpiricalQuality"
-    ERR_OBSERV_COL      = "Errors"  
+    OBS_COL             = "Observations"
+    ERR_OBSERV_COL      = "Errors" 
     # added for preprocessing
     NAME                = "RecalTable2"
     RG_SCORE_BIN_COL    = "RG_ScoreBin"
     QLTY_ERR_COL        = "QErr"
+    QLTY_PVAL_COL       = "QualityPval"  # numeric
     # categorial variables values
     MM_EVNT             = "M" # in EVNT_TYPE_COL
     CYC_COV             = "Cycle" # in COV_NAME_COL
@@ -48,13 +50,21 @@ class RC_TAB2:
 
 # Stat Auxiliary Table
 class RT2_STAT:
-    RG_N_COL                = "RG_N"
-    QLTY_ERR_AVG_COL        = "QErrAvg"
+    RG_N_COL                    = "RG_N"
+    # QLTY_ERR_AVG_COL            = "QErrAvg"
+
+    BIN_OBS_SUM_COL             = "BinSumObs"
+    BIN_ERR_OBSRV_SUM_COL      = "BinSumObsErrs"
     
-    RG_SCR_BINS_COV_N_COL   = "RG_ScrBin_COV_N"
-    RG_SCR_BIN_N_COL        = "RG_ScrBin_N"      
-    QLTY_ERR_W_AVG_COL      = "QErrWeightedAvg"
-    ID_COL                  = "ID"
+    BIN_AVG_EMP_QLTY_COL        = "BinAvgEmpQlty"
+    BIN_AVG_QLTY_PVAL_COL       = "BinAvgQltyPval"
+    BIN_AVG_QLTY_SCORE_COL      = "BinAvgQltyScore"
+    BIN_AVG_QLTY_ERR_COL        = "BinAvgQltyErr"
+    
+    # RG_SCR_BINS_COV_N_COL       = "RG_ScrBin_COV_N"
+    # RG_SCR_BIN_N_COL            = "RG_ScrBin_N"      
+    # QLTY_ERR_W_AVG_COL          = "QErrWeightedAvg"
+    ID_COL                      = "ID"
     
     ID_DELIM                = ":"
     COV_TYPE_COL_IDX        = 2

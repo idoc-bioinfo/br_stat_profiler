@@ -41,17 +41,20 @@ class UARGS:
     SCORE_BINS_COUNT    =   "scr_bin_count"
     MIN_SCORE           =   "min_score"
     MIN_ERR_OBSRV       =   "min_err_observed"
-    NUMERIC_QERR_MODE   =  "numeric_qerr_mode"
-    NO_RELU             =   "no_ReLU"
+    # NUMERIC_QERR_MODE   =  "numeric_qerr_mode"  # deprecated
+    # NO_RELU             =   "no_ReLU"           # deprecated
     CYC_BINS_COUNT      =   "cyc_bin_count"
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
+    KEEP_NAN_VALUE      =   "keep_nan_value"
     NO_ZSCORING         =   "no_zscore" # True
     # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
-    ARITHMETIC_MEAN     =   "arithmetic_mean"
+    # ARITHMETIC_MEAN     =   "arithmetic_mean"   # deprecated
+    QERR_CUTOFF         = "qerr_cutoff"
     
+       
 class PRVT_ARG:      # private arguments
     MM_CNTXT_SIZE       =   "mm_cntxt_size"   # argument if filled duting  analysis
 
@@ -96,22 +99,22 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-e',
         ArgPropKey.LONG_FLAG:'--' + UARGS.MIN_ERR_OBSRV,
     },
-    UARGS.NUMERIC_QERR_MODE: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
-        ArgPropKey.SHORT_FLAG:  '-num',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
-        ArgPropKey.ACTION:      'store_true',
-    },
-    UARGS.NO_RELU: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
-        ArgPropKey.SHORT_FLAG:  '-nR',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
-        ArgPropKey.ACTION:      'store_true',
-    },
+    # UARGS.NUMERIC_QERR_MODE: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
+    #     ArgPropKey.SHORT_FLAG:  '-num',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
+    # UARGS.NO_RELU: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
+    #     ArgPropKey.SHORT_FLAG:  '-nR',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
     UARGS.SCORE_BINS_COUNT: {
         ArgPropKey.DEFAULT: 4,
         ArgPropKey.TYPE:    int,
@@ -147,12 +150,20 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_CYC,
     },
     UARGS.NAN_REP: {
-        ArgPropKey.DEFAULT: None,
+        ArgPropKey.DEFAULT: 0,
         ArgPropKey.TYPE: int,
-        ArgPropKey.HELP: 'NaN representation for missing values, may be removed/imputed downstream',
-        ArgPropKey.METAVAR: '<int [None]>',
-        ArgPropKey.SHORT_FLAG: '-nan',
-        ArgPropKey.LONG_FLAG: '--' + UARGS.NAN_REP,
+        ArgPropKey.HELP:        'NaN representation for missing/cutoffed values, may be removed/imputed downstream',
+        ArgPropKey.METAVAR:     '<int [0]>',
+        ArgPropKey.SHORT_FLAG:  '-nan',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NAN_REP,
+    },
+     UARGS.KEEP_NAN_VALUE: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (instead of 0)',
+        ArgPropKey.SHORT_FLAG:  '-kN',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
+        ArgPropKey.ACTION:      'store_true',
     },
     UARGS.NO_ZSCORING: {
         ArgPropKey.DEFAULT:     False,
@@ -167,7 +178,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE:        str,
         ArgPropKey.CHOICES:     ["cntxt", "cyc", "cntxt_cyc"],
         ArgPropKey.HELP:        'Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or both (context + cycle).',
-        ArgPropKey.METAVAR:     '<' + UARGS.COV_TYPE + '>',
+        ArgPropKey.METAVAR:     '<' + 'choices [cntxt]' + '>',
         ArgPropKey.SHORT_FLAG:  '-ct',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
     },
@@ -180,13 +191,22 @@ ARGS_PROPERTIES = {
     #     ArgPropKey.SHORT_FLAG:  '-pt',
     #     ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
     # },
-    UARGS.ARITHMETIC_MEAN: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
-        ArgPropKey.SHORT_FLAG:  '-aM',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
-        ArgPropKey.ACTION:      'store_true',
+    # UARGS.ARITHMETIC_MEAN: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
+    #     ArgPropKey.SHORT_FLAG:  '-aM',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
+    UARGS.QERR_CUTOFF: {
+        ArgPropKey.DEFAULT: 2,
+        ArgPropKey.TYPE: float,
+        # ArgPropKey.MIN: -10,
+        ArgPropKey.HELP: 'Cutoff for Qerror',
+        ArgPropKey.SHORT_FLAG: '-co',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.QERR_CUTOFF,
+        ArgPropKey.METAVAR:     '<' + 'float [2]' + '>',
     },
 }
 

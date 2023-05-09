@@ -2,6 +2,7 @@ import re
 import itertools
 import pandas as pd
 import numpy as np
+import math
 from sklearn.preprocessing import StandardScaler
 
 # usr-defined dependencies
@@ -164,18 +165,6 @@ def preprocess_rc_tab2_df(GATK_Tables, rt1_df, args_dict):
         (rt2_df[RC_TAB2.ERR_OBSERV_COL] >= args_dict[UARGS.MIN_ERR_OBSRV])
         ]
     
-    # calculating the QError (quality_score - empyrical quality)
-    rt2_df[RC_TAB2.QLTY_ERR_COL] = pd.to_numeric(rt2_df[RC_TAB2.EMP_QLTY_COL]) - \
-        pd.to_numeric(rt2_df[RC_TAB2.QLTY_SCORE_COL])
-
-    # calculate numeric QError (Ratio) instead of Phread (default False)
-    if args_dict[UARGS.NUMERIC_QERR_MODE]:
-        rt2_df[RC_TAB2.QLTY_ERR_COL] = rt2_df[RC_TAB2.QLTY_ERR_COL].apply(lambda x: pow(10,x/10))   
-    
-    # apply ReLU function to the errors unless no_relu (default False)
-    if not args_dict[UARGS.NO_RELU]:
-        rt2_df[RC_TAB2.QLTY_ERR_COL] = rt2_df[RC_TAB2.QLTY_ERR_COL].apply(lambda x: max(0, x))
-
     # add score bins values from rc_tab1_df
     rt2_df = pd.merge(rt2_df, rt1_df[[RC_TAB1.QLTY_SCORE_COL, RC_TAB1.RG_SCORE_BIN_COL]],
                       on=RC_TAB1.QLTY_SCORE_COL, how='left')
@@ -197,11 +186,8 @@ def filter_cov_type(rt2_df, cov_type):
     return cyc_rt2_df.rename(columns={RC_TAB2.COV_VAL_COL:cov_type})
 
 
-# group by ReadGroup, ScoreQunntlie and Value(cycle, context)
-# calculates statistics of ScoreQltyError average and group frequency (see below)
 def calculate_stat_rt2_df(item_rt2_df, cov_type):
-    """Calculate statistics table per a covariate per ReadGroup per ScoreBin:
-        - QError arithmetic mean 
+    """Calculate statistics per covariate & ReadGroup & ScoreBin:
         - QError weighted mean within ReadGroup and ScoreBin
 
     Args:
@@ -211,29 +197,46 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
     Returns:
         pd.Dataframe: Table with arithmethic and weighted mean statistics 
     """
-    # Groupby ReadGroup, READ_GROUP_SCORE_BIN  and a coveriat
-    # For each subgroup calculate AVERAGE_quality_err and N
-    item_rt2_stat_df = item_rt2_df.groupby(
-        [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL, cov_type]
-        )[RC_TAB2.QLTY_ERR_COL].agg(
-            [(RT2_STAT.QLTY_ERR_AVG_COL,'mean'),   
-              (RT2_STAT.RG_SCR_BINS_COV_N_COL,'size')]
-            ).reset_index()
     
-    # groupby both ReadGroup and ReadGroupScoreBins and calculate groups sizes  (currently unused in the profile)
-    rg_bin_group_sizes = item_rt2_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).size().\
-        reset_index().rename(columns={0:RT2_STAT.RG_SCR_BIN_N_COL})
+    # convert Phred to pvals (for averaging)
+    item_rt2_df[RC_TAB2.QLTY_PVAL_COL] = 10 ** (-item_rt2_df[RC_TAB2.QLTY_SCORE_COL]/10)
 
-    # add the groups sizes as columns to the RecalTable  
-    item_rt2_stat_df = pd.merge(item_rt2_stat_df, rg_bin_group_sizes, on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]).\
-            set_index(item_rt2_stat_df.index)  # row index unchanged
 
-    # calculated of weighted average of a cov QError (per Readgroup+Bin)
-    item_rt2_stat_df[RT2_STAT.QLTY_ERR_W_AVG_COL] = item_rt2_stat_df[RT2_STAT.QLTY_ERR_AVG_COL] * \
-        (item_rt2_stat_df[RT2_STAT.RG_SCR_BINS_COV_N_COL] / item_rt2_stat_df[RT2_STAT.RG_SCR_BIN_N_COL])
+    # calculate collective Quality Score (weighted average)
+    grp_score_df = item_rt2_df.groupby(
+        [RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])\
+        .apply(lambda x: np.average(x[RC_TAB2.QLTY_PVAL_COL].astype(float), 
+                                    weights=x[RC_TAB2.OBS_COL].astype(int)))\
+                                        .reset_index().rename(
+                                            columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
+                                        
+    grp_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+        grp_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(lambda x: -10 * math.log10(x))
 
-    return item_rt2_stat_df
+    # summerize the observations and errors
+    items_sum_obs_errs = item_rt2_df.groupby(
+        [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL, cov_type]) \
+            [[RC_TAB2.OBS_COL, RC_TAB2.ERR_OBSERV_COL]]\
+            .sum() \
+            .rename(columns={RC_TAB2.OBS_COL:RT2_STAT.BIN_OBS_SUM_COL, 
+                                RC_TAB2.ERR_OBSERV_COL:RT2_STAT.BIN_ERR_OBSRV_SUM_COL})\
+                                    .reset_index()
 
+    # calculate empyrical collective error (phred formula)
+    items_sum_obs_errs[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+        -10 * np.log10(items_sum_obs_errs[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
+            / items_sum_obs_errs[RT2_STAT.BIN_OBS_SUM_COL])
+
+    # merge data into a new stat dataframe            
+    stat_df = pd.merge(grp_score_df, items_sum_obs_errs,
+                    on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])
+
+    # Calculate QError
+    stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
+        stat_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - stat_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
+    
+    
+    return stat_df
 
 # add to a stat_df all the missing values from the full collection  of the values
 def complete_missing_values(stat_df, full_cov_collection):
@@ -321,7 +324,7 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
     return cyc_rt2_df
 
 
-# generate stat_df from rt2_df based on mode {RC_TAB2.CYC_COV or RC_TAB2.CNTXT_COV}
+
 def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_COV or RC_TAB2.CNTXT_COV
     """Preparation a statistics table before profile extraction
 
@@ -333,10 +336,11 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
     Returns:
         pd.Dataframe: stat table for profile extraction
     """
-    target_colname = cov_type
     full_library = []
+    target_colname = cov_type
     mode_rt2_df = filter_cov_type(rt2_df, cov_type)
-       
+
+        
     if cov_type == RC_TAB2.CYC_COV: 
         # generates colletion of all the optional cycles (abs)
         cyc_range_abs = list(range(args_dict[UARGS.MIN_CYC],args_dict[UARGS.MAX_CYC]+1))
@@ -347,7 +351,6 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
         
         mode_rt2_df =  add_cyc_bins(mode_rt2_df,cyc_range_abs, args_dict)
         target_colname = CYC_RT2.CYC_BIN_COL
-        
     elif cov_type == RC_TAB2.CNTXT_COV: 
         # generation of a complete set of contexts 
         combinations = list(itertools.product(['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
@@ -355,12 +358,13 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
         full_library = [''.join(comb) for comb in combinations]
 
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
+    # removing small value (noise?)
+    rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
+
     rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
     rt2_stat_df = add_id_column(rt2_stat_df)
-    # sorting the stat table for uniformity before profile extraction
-    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL]) # uniform order before profile extraction
+    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True) # uniform order before profile extraction
     return rt2_stat_df
-
 
 def _preprocess_recal_table(filename_full_path, args_dict):
     """preprocess GATKReport:  
@@ -390,10 +394,7 @@ def preprocess_recal_table(args_dict):
     return _preprocess_recal_table(args_dict[UARGS.INFILE], args_dict)
 
 
-# extract profiles from the stat_df by key values in key_column (=ReadGroup)
-# the profile values are in the val_colname
-# idx is taken from row_idx_colname (equeal index for all the keys in the stat_df)
-# returns Dataframe of profiles per ReadGroup (=column) sorted by row_index
+
 def extract_profiles_from_stat_df(stat_df, read_group, stat_type, idx_col, add_id_prefix=True):
     """Extracts the covariates value into a profile table. 
     Set the ID column to be the profile index, add the covariate type as prefix to the index
@@ -445,22 +446,17 @@ def extract_profile(stat_df, args_dict):
     q_err_profile   = pd.DataFrame()
     target_colname  = ""
     
-    if args_dict[UARGS.ARITHMETIC_MEAN]: # False by default 
-        target_colname  = RT2_STAT.QLTY_ERR_AVG_COL
-    else:
-        target_colname  = RT2_STAT.QLTY_ERR_W_AVG_COL 
-    
+    target_colname  = RT2_STAT.BIN_AVG_QLTY_ERR_COL
     q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
                                        target_colname, RT2_STAT.ID_COL)
         
     if not args_dict[UARGS.NO_ZSCORING]: # Default !!!
         q_err_profile = pd.DataFrame(scaler.fit_transform(q_err_profile),
                                     columns=q_err_profile.columns, index=q_err_profile.index)
-    if args_dict[UARGS.NAN_REP]: # nan_rep == None by default
+    if not args_dict[UARGS.KEEP_NAN_VALUE]: # nan_rep == None by default
         q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
     
     return q_err_profile
-
 
 def profile_rt(pre_stat_df, args_dict):
     """
