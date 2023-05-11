@@ -366,7 +366,7 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
     
     # add wooble position statistics if needed
-    if not args_dict[UARGS.NO_WOBBLE]:   # preform wobble
+    if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:   # preform wobble
         rt2_stat_df = add_wobble_data(rt2_stat_df, args_dict)
     
     # remove statistics values below the cutoff (remove noise?)
