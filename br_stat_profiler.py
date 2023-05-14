@@ -504,7 +504,7 @@ def extract_profile(stat_df, args_dict):
     
     target_colname  = RT2_STAT.BIN_AVG_QLTY_ERR_COL
     q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
-                                       target_colname, RT2_STAT.ID_COL)
+                                       target_colname, RT2_STAT.ID_COL, add_id_prefix=False)
         
     if not args_dict[UARGS.NO_ZSCORING]: # Default !!!
         q_err_profile = pd.DataFrame(scaler.fit_transform(q_err_profile),

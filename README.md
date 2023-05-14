@@ -117,23 +117,20 @@ a CSV format file (or stream)
 **Example**: profile of GATKReport with a single ReadGroup (HVWKMCCXY)
 
 ```
-                                 HVWKMCCXY
-BinAvgQltyErr:AAAA:0:Context	-1.009847
-BinAvgQltyErr:AAAA:1:Context	-0.862207
-BinAvgQltyErr:AAAA:2:Context	-1.009847
-BinAvgQltyErr:AAAA:3:Context	0.950003
-BinAvgQltyErr:AAAC:0:Context	-0.806285
+               HVWKMCCXY
+AAAA:0:Context	-1.009847
+AAAA:1:Context	-0.862207
+AAAA:2:Context	-1.009847
+AAAA:3:Context	0.950003
+AAAC:0:Context	-0.806285
 ```
 
-**row_index** is comprised of 4 tokens joined with ":" as seperator:
+**row_index** is comprised of 3 tokens joined with ":" as seperator:
 
-##### **\< CALCULATION   :   COV_VALUE   :   Q_SCORE_BIN   :   COVARIATE >**
+##### **\< COV_VALUE   :   Q_SCORE_BIN   :   COVARIATE >**
 
 ```
-CALCULATION -   Option  I) QErrWeightedAvg for QError Weighted Average per ReadGroup & ScoreBin
-                Option II) QErrAvg for QError Arithmetic Average per ReadGroup & ScoreBin
-
-COV_VALUE   -   Option  I) Genomic context of the error (i.e "AAAA")
+COV_VALUE   -   Option  I) Genomic context of the error (i.e "AAAA" or "AAAN" using the default wooble option)
                 Option II) Read Cycle Bin which corrosponds to a position range on the read
 
 Q_SCORE_BIN -   The Sequencing QScore bin (the defulat is 4 bins)

@@ -53,7 +53,7 @@ class UARGS:
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
     # ARITHMETIC_MEAN     =   "arithmetic_mean"   # deprecated
     QERR_CUTOFF         =   "qerr_cutoff"
-    MAX_WOBBLE_OCC      =   "max_wobble_occurrences"
+    MAX_WOBBLE_OCC      =   "max_wobble_occ"
     NO_WOBBLE           =   "no_wobble"
     
        
