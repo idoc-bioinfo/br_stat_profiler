@@ -32,8 +32,8 @@ def create_dtype_dict(formats_list ):
                 dtype_dict[substring] = int
     return dtype_dict
 
-
-def harvest_recal_table(in_wrapper):
+REPORT_LINE_COuNT=5000
+def harvest_recal_table(args_dict):
     """ Reads all the tables in a GATK (V4.4.0.0) BaseRecalibrator Report into Dataframes
 
     Args:
@@ -42,13 +42,19 @@ def harvest_recal_table(in_wrapper):
     Returns:
         pd.Series: array with the harvested dataframes of the GATK Report. The index name is the Table name as appears in the GATK Report
     """
+    lines_count=0
+    in_wrapper  = args_dict[UARGS.INFILE]
+    log_f       = args_dict[UARGS.LOG_FILE]
     harveseted_tables = pd.Series(dtype='object')   # the result list to save the harvested tables
     # with open(filename, 'r', encoding="utf-8") as f:
     with in_wrapper as f:
         line = f.readline()
+        lines_count+=1
         while line:  # iterate until the end of the file
+                           
             if not re.match(RT_HDR.TAB_PROP_PATTERN, line.rstrip()):
                 line = f.readline()
+                lines_count+=1
                 continue
 
             # properties header detected
@@ -68,6 +74,7 @@ def harvest_recal_table(in_wrapper):
 
             # extract column names
             line = f.readline()
+            lines_count+=1
             COLs= line.rstrip().split()
 
             # opening new data frame with the names and types
@@ -78,10 +85,15 @@ def harvest_recal_table(in_wrapper):
 
             for i in range(0, row_count):
                 line = f.readline()
+                lines_count+=1
+                if (lines_count % REPORT_LINE_COuNT) == 0:
+                    print("line#", lines_count, file = log_f)
+                    log_f.flush()
                 df.loc[i] = line.rstrip().split()
 
             df = df.astype(col_dict)
-            print("harvested completed:",table_name)
+            print("harvested completed:",table_name, file=log_f)
+            log_f.flush()
 
             harveseted_tables[table_name] = df  # add the harvested dataframe with its name as index
 
@@ -135,7 +147,8 @@ def preprocess_rt1_df(GATK_Tables, args_dict):
     # filter the scores above MIN_SCORE
     rt1_df = rt1_df[
         (rt1_df[RC_TAB1.EVNT_TYPE_COL] == RC_TAB1.MM_EVNT) & \
-        (rt1_df[RC_TAB1.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE])
+        (rt1_df[RC_TAB1.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE]) & \
+        (rt1_df[RC_TAB1.QLTY_SCORE_COL] <= args_dict[UARGS.MAX_SCORE])
         ]
     # # Add columns bin the scores in each ReadGrpou and add a column with the score bins 
     rt1_df[RC_TAB1.RG_SCORE_BIN_COL] = divide_into_ranges(rt1_df[RC_TAB1.QLTY_SCORE_COL], K=args_dict[UARGS.SCORE_BINS_COUNT])
@@ -163,6 +176,7 @@ def preprocess_rc_tab2_df(GATK_Tables, rt1_df, args_dict):
     rt2_df = rt2_df[
         (rt2_df[RC_TAB2.EVNT_TYPE_COL] == RC_TAB2.MM_EVNT)              & \
         (rt2_df[RC_TAB2.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE])  & \
+        (rt2_df[RC_TAB2.QLTY_SCORE_COL] <= args_dict[UARGS.MAX_SCORE])  & \
         (rt2_df[RC_TAB2.ERR_OBSERV_COL] >= args_dict[UARGS.MIN_ERR_OBSRV])
         ]
     
@@ -326,7 +340,6 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
 
 
 
-
 def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_COV or RC_TAB2.CNTXT_COV
     """Preparation a statistics table before profile extraction
 
@@ -342,6 +355,9 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
     full_library = []
     target_colname = cov_type
     mode_rt2_df = filter_cov_type(rt2_df, cov_type)
+    # unifying the readgroup from format C5BCAACXX:1:none 
+    if args_dict[UARGS.EXTRACT_READ_GROUP]:
+        mode_rt2_df[RC_TAB2.RG_COL] = mode_rt2_df[RC_TAB2.RG_COL].apply(lambda x: x.split(':')[0])
         
     if cov_type == RC_TAB2.CYC_COV:   # cycles statistics
         # generates colletion of all the optional cycles (abs)
@@ -360,7 +376,7 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
             combinations = list(itertools.product(['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
             full_library = [''.join(comb) for comb in combinations]
         else:  # with woble
-            full_library = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict[UARGS.MAX_WOBBLE_OCC], only_with_wob=False)
+            full_library = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict, only_with_wob=False)
 
     # calculate statistics without wooble 
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
@@ -370,7 +386,13 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
         rt2_stat_df = add_wobble_data(rt2_stat_df, args_dict)
     
     # remove statistics values below the cutoff (remove noise?)
-    rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
+    if args_dict[UARGS.QERR_SYM_CUTOFF]:
+        rt2_stat_df = rt2_stat_df[
+            (rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF])  | \
+            (rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] <= -args_dict[UARGS.QERR_CUTOFF])]
+    else:
+        rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
+
 
     # complete the missing set of data (as None)
     rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
@@ -422,7 +444,8 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):  # mode = either RC_TAB2.CYC_C
 #     rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True) # uniform order before profile extraction
 #     return rt2_stat_df
 
-def _preprocess_recal_table(filename_full_path, args_dict):
+# def _preprocess_recal_table(filename_full_path, args_dict):
+def preprocess_recal_table(args_dict):
     """preprocess GATKReport:  
         - harvest the data into dataframes
         - bin the scores
@@ -436,7 +459,7 @@ def _preprocess_recal_table(filename_full_path, args_dict):
         pd.Dataframe: preprocessed RecalTable1
     """ 
     
-    GATKTables = harvest_recal_table(filename_full_path)
+    GATKTables = harvest_recal_table(args_dict)
     # fetch the mismatch context size argument from the GATKReport (Argument table)
     args_df = GATKTables[ARG_TAB.NAME]
     args_dict[PRVT_ARG.MM_CNTXT_SIZE] = int(args_df[args_df["Argument"] == ARG_TAB.MM_CNTXT_SIZE]["Value"])
@@ -446,8 +469,8 @@ def _preprocess_recal_table(filename_full_path, args_dict):
     return preprocess_rc_tab2_df(GATKTables, rt1_df, args_dict) # add ScoreBin
 
 
-def preprocess_recal_table(args_dict):
-    return _preprocess_recal_table(args_dict[UARGS.INFILE], args_dict)
+# def preprocess_recal_table(args_dict):
+#     return _preprocess_recal_table(args_dict[UARGS.INFILE], args_dict)
 
 
 
@@ -509,7 +532,7 @@ def extract_profile(stat_df, args_dict):
     if not args_dict[UARGS.NO_ZSCORING]: # Default !!!
         q_err_profile = pd.DataFrame(scaler.fit_transform(q_err_profile),
                                     columns=q_err_profile.columns, index=q_err_profile.index)
-    if not args_dict[UARGS.KEEP_NAN_VALUE]: # nan_rep == None by default
+    if not args_dict[UARGS.KEEP_NAN_VALUE]: # nan_rep == 0 by default
         q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
     
     return q_err_profile
@@ -592,7 +615,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     #============================================================
     
-    adict = check_args(args) 
+    adict = check_args(args)
     # [print(key,":",val) for key,val in adict.items()] 
     rt2_pre_stat_df = preprocess_recal_table(adict)
     profile = profile_rt(rt2_pre_stat_df, adict)

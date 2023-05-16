@@ -40,6 +40,7 @@ class UARGS:
     CONCAT_OLDER        =   "concat_older"
     SCORE_BINS_COUNT    =   "scr_bin_count"
     MIN_SCORE           =   "min_score"
+    MAX_SCORE           =   "max_score"
     MIN_ERR_OBSRV       =   "min_err_observed"
     # NUMERIC_QERR_MODE   =  "numeric_qerr_mode"  # deprecated
     # NO_RELU             =   "no_ReLU"           # deprecated
@@ -53,8 +54,14 @@ class UARGS:
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
     # ARITHMETIC_MEAN     =   "arithmetic_mean"   # deprecated
     QERR_CUTOFF         =   "qerr_cutoff"
-    MAX_WOBBLE_OCC      =   "max_wobble_occ"
+    QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
+    # MAX_WOBBLE_OCC      =   "max_wobble_occ"
     NO_WOBBLE           =   "no_wobble"
+    MAX_WOB_R_Y_OCC     = "max_wob_R_Y_occ"
+    MAX_WOB_N_OCC       = "max_wob_N_occ"
+    NO_LOG_FILE         = "no_log"
+    LOG_FILE            = "log_file"
+    EXTRACT_READ_GROUP  = "extract_read_group"
     
        
 class PRVT_ARG:      # private arguments
@@ -77,6 +84,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-o',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.OUTFILE,   
     },
+    UARGS.LOG_FILE: {   # outfile 
+        ArgPropKey.DEFAULT:     sys.stderr,
+        ArgPropKey.TYPE:        argparse.FileType('x'),
+        ArgPropKey.HELP:        'NON-EXISTING file for profile metadata .',
+        ArgPropKey.METAVAR:     '<*.* [stderr]>',
+        ArgPropKey.SHORT_FLAG:  '-lg',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.LOG_FILE,   
+    },
     UARGS.CONCAT_OLDER: {   # outfile 
         ArgPropKey.DEFAULT:     None,
         ArgPropKey.TYPE:        str,
@@ -93,8 +108,16 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-mq',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MIN_SCORE,
     },
+    UARGS.MAX_SCORE: {
+        ArgPropKey.DEFAULT: 100,
+        ArgPropKey.TYPE: int,
+        ArgPropKey.MAX: 100,
+        ArgPropKey.HELP: 'Maximal QualityScore value for profiling',
+        ArgPropKey.SHORT_FLAG: '-mxq',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_SCORE,
+    },
     UARGS.MIN_ERR_OBSRV: {
-        ArgPropKey.DEFAULT: 10,
+        ArgPropKey.DEFAULT: 100,
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.HELP:    'Minimal Number of Errornous Observations for profiling',
@@ -159,10 +182,18 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-nan',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NAN_REP,
     },
+    UARGS.QERR_SYM_CUTOFF: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Symmetrical qerr cutoff. For example, for cutoff=3, QErrors below 3 and above -3 are cut',
+        ArgPropKey.SHORT_FLAG:  '-sym',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.QERR_SYM_CUTOFF,
+        ArgPropKey.ACTION:      'store_true',
+    },
      UARGS.KEEP_NAN_VALUE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (instead of 0)',
+        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
         ArgPropKey.SHORT_FLAG:  '-kN',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
         ArgPropKey.ACTION:      'store_true',
@@ -219,14 +250,39 @@ ARGS_PROPERTIES = {
         ArgPropKey.ACTION:      'store_true',
     },
     
-    UARGS.MAX_WOBBLE_OCC: {
+    UARGS.MAX_WOB_N_OCC: {
         ArgPropKey.DEFAULT:     2,
         ArgPropKey.TYPE:        int,
-        ArgPropKey.MIN:         1,
-        ArgPropKey.HELP:        'Maximal occurence of wobble positions (N) in the k-mers statistic calculation',
-        ArgPropKey.SHORT_FLAG: '-mW',
-        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOBBLE_OCC,
+        # ArgPropKey.MIN:         1,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions N in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-wN',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_N_OCC,
         ArgPropKey.METAVAR:     '<' + 'int [2]' + '>',
+    },
+    UARGS.MAX_WOB_R_Y_OCC: {
+        ArgPropKey.DEFAULT:     3,
+        ArgPropKey.TYPE:        int,
+        # ArgPropKey.MIN:          1,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions R (Purins) and Y (Pyrmidins) in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-wRY',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_R_Y_OCC,
+        ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
+    },
+    UARGS.NO_LOG_FILE: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Without log file',
+        ArgPropKey.SHORT_FLAG:  '-nL',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_LOG_FILE,
+        ArgPropKey.ACTION:      'store_true',
+    },
+    UARGS.EXTRACT_READ_GROUP: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Without log file',
+        ArgPropKey.SHORT_FLAG:  '-xRG',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
+        ArgPropKey.ACTION:      'store_true',
     },
 }
 
@@ -272,6 +328,9 @@ def complete_uargs_metavar_info(args_properties):
         
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
         f'<int min={args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]} [{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
+    
+    args_properties[UARGS.MAX_SCORE][ArgPropKey.METAVAR] = \
+        f'<int max={args_properties[UARGS.MAX_SCORE][ArgPropKey.MAX]} [{args_properties[UARGS.MAX_SCORE][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.MIN_ERR_OBSRV][ArgPropKey.METAVAR] = \
         f'<int between {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
@@ -282,8 +341,8 @@ def complete_uargs_metavar_info(args_properties):
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
         f'<int between {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
     
-    args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.METAVAR] = \
-        f'<int min={args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.MIN]} [{args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.DEFAULT]}]>'
+    # args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.METAVAR] = \
+    #     f'<int min={args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.MIN]} [{args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.DEFAULT]}]>'
 
     return args_properties
 
@@ -368,7 +427,13 @@ def check_min_max_cycle(args):
 
 def check_args(parser_args):
     args_props= get_global_args_properties()
-    parser_dict = vars(parser_args) # parser 
+    parser_dict = vars(parser_args) # parser
+    args_dict = vars(parser_args) 
+    
+    if not args_dict[UARGS.NO_LOG_FILE]:
+        log_f = args_dict[UARGS.LOG_FILE]
+        [print(key,":",val, file=log_f) for key,val in args_dict.items()]
+        log_f.flush()
     # preform checks 
     check_int_scope(args_props, parser_args)
     verify_outfile_csv(parser_args)
@@ -399,7 +464,7 @@ if __name__ == "__main__":
     args = parser.parse_args(cmd.split())
     check_args(args)
     args_dict = vars(args)
-    [print(key,":",val) for key,val in args_dict.items()] 
+    # [print(key,":",val) for key,val in args_dict.items()] 
     # print(args_dict[UARGS.INFILE])
     parser.print_help()
 

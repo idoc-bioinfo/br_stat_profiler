@@ -4,32 +4,45 @@ import pandas as pd
 
 from user_args import PRVT_ARG, UARGS
 from constants import RT2_STAT, RC_TAB2
+class Wobble:
+    patterns_dict = {
+        'N':   '.',
+        'R':   '[AG]',
+        'Y':   '[TC]',
+        #  'W':   '[AT]',
+        #  'S':   '[CG]',
+        #  'M':   '[AC]',
+    } 
 
-wob_patterns = {
-     'N':   '.',
-     'R':   '[AG]',
-     'Y':   '[TC]',
-    #  'W':   '[AT]',
-    #  'S':   '[CG]',
-    #  'M':   '[AC]',
-}
-
-def match_wobbled_k_mer(wobbled_k_mer, k_mer):
-    """Check if k-mer matches wobbled k_mer
-    Args:
-        wob_cntxt (str): wobbled_k_mer
-        k_mer (str): _description_
-        
-    Returns:
-        bool: matched / unmated
-    """    
-    wob_regex = wobbled_k_mer
-    # converet the wobbled_k_mer to regex pattern
-    for wob_base in wob_patterns.keys(): 
-        wob_regex = wob_regex.replace(wob_base, wob_patterns[wob_base])
-        
-    pattern = rf'^{wob_regex}$'
-    return bool(re.match(pattern, k_mer))
+    def match_k_mer(wobbled_k_mer, k_mer):
+        """Check if k-mer matches wobbled k_mer
+        Args:
+            wob_cntxt (str): wobbled_k_mer
+            k_mer (str): _description_
+            
+        Returns:
+            bool: matched / unmated
+        """    
+        wob_regex = wobbled_k_mer
+        # converet the wobbled_k_mer to regex pattern
+        for wob_base in Wobble.patterns_dict.keys(): 
+            wob_regex = wob_regex.replace(wob_base, Wobble.patterns_dict[wob_base])
+            
+        pattern = rf'^{wob_regex}$'
+        return bool(re.match(pattern, k_mer))
+    
+    def has_any(tested_str):
+        for wob in Wobble.patterns_dict.keys():
+            if wob in tested_str:
+                return True
+        return False
+    
+    def count_N_occ(tested_str):
+        return tested_str.count('N')
+    
+    def count_R_Y_occ(tested_str):
+        return (tested_str.count('R') + tested_str.count('Y'))
+   
 
 
 def get_wobbled_k_mers(K, args_dict, only_with_wob=False):
@@ -47,12 +60,15 @@ def get_wobbled_k_mers(K, args_dict, only_with_wob=False):
     max_pur_pyr_occ = args_dict[UARGS.MAX_WOB_R_Y_OCC]
     wobble_combinations = list(itertools.product(['A', 'C', 'G', 'T', 'N', 'R','Y'], repeat=K))
     wobble_str_lst = [''.join(comb) for comb in wobble_combinations]
-    # filter out k-mers with wobbles position above threshold value
-    filtered_wob_string = [s for s in wobble_str_lst if s.count('N') <= max_wobble_occ]   
-    filtered_wob_string = [s for s in filtered_wob_string if (s.count('R') + s.count('Y')) <= max_pur_pyr_occ] 
-    # filter out k-mers without wooble position at all
+    # filter out k-mers with wobbles position above threshold values
+    filtered_wob_string = [
+        s for s in wobble_str_lst \
+            if (Wobble.count_N_occ(s) <= max_wobble_occ) and \
+                (Wobble.count_R_Y_occ(s) <= max_pur_pyr_occ) 
+        ]
+    # # filter out k-mers without wooble position at all
     if only_with_wob: 
-        filtered_wob_string = [s for s in filtered_wob_string if 'N' in s or 'R' in s or 'Y' in s]
+        filtered_wob_string = [s for s in filtered_wob_string if Wobble.has_any(s)]
     return filtered_wob_string
 
 # def get_wobbled_k_mers(K, args_dict, only_with_wob=False):
@@ -155,7 +171,7 @@ def add_wobble_data(stat_df, args_dict):
         if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:   # Should never happen in a real world scenario (only in testing)
             continue
         # extract the rows that matches wob_k_mer
-        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: match_wobbled_k_mer(wob_k_mer, x))]
+        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: Wobble.match_k_mer(wob_k_mer, x))]
         if wob_df.empty:   # no rows with wob_k_mer matching
             continue
         #calculate the wob info
