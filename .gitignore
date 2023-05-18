@@ -2,6 +2,9 @@ backup/
 data/
 .vscode/
 outfiles/
+notbooks/
+qerr_profiles/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
