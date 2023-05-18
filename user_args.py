@@ -18,6 +18,7 @@ class ArgPropKey(StrEnum):
     LONG_FLAG   =   'long_flag'
     NARGS       =   'nargs'
     ACTION      =   'action'
+    VERSION     = 'version'
    
 # draft_prop = {
 #     ArgPropKey.DEFAULT: 10,
@@ -33,37 +34,38 @@ class ArgPropKey(StrEnum):
 #     ArgPropKey.ACTION:  None, # store_true
 # }
 
+VERSION_NUMBER='1.0'
 
 class UARGS:
     INFILE              =   "infile"
     OUTFILE             =   "outfile"
-    CONCAT_OLDER        =   "concat_older"
     SCORE_BINS_COUNT    =   "scr_bin_count"
     MIN_SCORE           =   "min_score"
     MAX_SCORE           =   "max_score"
     MIN_ERR_OBSRV       =   "min_err_observed"
-    # NUMERIC_QERR_MODE   =  "numeric_qerr_mode"  # deprecated
-    # NO_RELU             =   "no_ReLU"           # deprecated
     CYC_BINS_COUNT      =   "cyc_bin_count"
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
     KEEP_NAN_VALUE      =   "keep_nan_value"
     NO_ZSCORING         =   "no_zscore" # True
-    # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
-    # ARITHMETIC_MEAN     =   "arithmetic_mean"   # deprecated
     QERR_CUTOFF         =   "qerr_cutoff"
     QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
-    # MAX_WOBBLE_OCC      =   "max_wobble_occ"
     NO_WOBBLE           =   "no_wobble"
-    MAX_WOB_R_Y_OCC     = "max_wob_R_Y_occ"
-    MAX_WOB_N_OCC       = "max_wob_N_occ"
-    NO_LOG_FILE         = "no_log"
-    LOG_FILE            = "log_file"
-    EXTRACT_READ_GROUP  = "extract_read_group"
-    
-       
+    MAX_WOB_N_OCC       =   "max_wob_N_occ"
+    MAX_WOB_R_Y_OCC     =   "max_wob_R_Y_occ"
+    NO_LOG_FILE         =   "no_log"
+    LOG_FILE            =   "log_file"
+    EXTRACT_READ_GROUP  =   "extract_read_group"
+    # depracted
+    # NUMERIC_QERR_MODE   =  "numeric_qerr_mode" 
+    # NO_RELU             =   "no_ReLU"          
+    # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
+    # ARITHMETIC_MEAN     =   "arithmetic_mean"   
+    # CONCAT_OLDER        =   "concat_older"
+
+     
 class PRVT_ARG:      # private arguments
     MM_CNTXT_SIZE       =   "mm_cntxt_size"   # argument if filled duting  analysis
 
@@ -92,14 +94,6 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-lg',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.LOG_FILE,   
     },
-    UARGS.CONCAT_OLDER: {   # outfile 
-        ArgPropKey.DEFAULT:     None,
-        ArgPropKey.TYPE:        str,
-        ArgPropKey.HELP:        'Add (concatenate result) to older profile (EXISTING csv file)',
-        ArgPropKey.METAVAR:     '<*.csv>',
-        ArgPropKey.SHORT_FLAG:  '-a',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.CONCAT_OLDER,   
-    },
     UARGS.MIN_SCORE: {
         ArgPropKey.DEFAULT: 1,
         ArgPropKey.TYPE: int,
@@ -124,22 +118,6 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-e',
         ArgPropKey.LONG_FLAG:'--' + UARGS.MIN_ERR_OBSRV,
     },
-    # UARGS.NUMERIC_QERR_MODE: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
-    #     ArgPropKey.SHORT_FLAG:  '-num',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
-    # UARGS.NO_RELU: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
-    #     ArgPropKey.SHORT_FLAG:  '-nR',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
     UARGS.SCORE_BINS_COUNT: {
         ArgPropKey.DEFAULT: 4,
         ArgPropKey.TYPE:    int,
@@ -174,6 +152,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-mxc',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_CYC,
     },
+    UARGS.KEEP_NAN_VALUE: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
+        ArgPropKey.SHORT_FLAG:  '-kN',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
+        ArgPropKey.ACTION:      'store_true',
+    },
     UARGS.NAN_REP: {
         ArgPropKey.DEFAULT:     0,
         ArgPropKey.TYPE:        float,
@@ -188,14 +174,6 @@ ARGS_PROPERTIES = {
         ArgPropKey.HELP:        'Symmetrical qerr cutoff. For example, for cutoff=3, QErrors below 3 and above -3 are cut',
         ArgPropKey.SHORT_FLAG:  '-sym',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.QERR_SYM_CUTOFF,
-        ArgPropKey.ACTION:      'store_true',
-    },
-     UARGS.KEEP_NAN_VALUE: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
-        ArgPropKey.SHORT_FLAG:  '-kN',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
         ArgPropKey.ACTION:      'store_true',
     },
     UARGS.NO_ZSCORING: {
@@ -215,23 +193,6 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-ct',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
     },
-    # UARGS.PROFILE_TYPE: {   # outfile 
-    #     ArgPropKey.DEFAULT:     "err_mean_and_freq",
-    #     ArgPropKey.TYPE:        str,
-    #     ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
-    #     ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
-    #     ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
-    #     ArgPropKey.SHORT_FLAG:  '-pt',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
-    # },
-    # UARGS.ARITHMETIC_MEAN: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
-    #     ArgPropKey.SHORT_FLAG:  '-aM',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
     UARGS.QERR_CUTOFF: {
         ArgPropKey.DEFAULT: 2,
         ArgPropKey.TYPE: float,
@@ -249,7 +210,6 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_WOBBLE,
         ArgPropKey.ACTION:      'store_true',
     },
-    
     UARGS.MAX_WOB_N_OCC: {
         ArgPropKey.DEFAULT:     2,
         ArgPropKey.TYPE:        int,
@@ -279,16 +239,57 @@ ARGS_PROPERTIES = {
     UARGS.EXTRACT_READ_GROUP: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Without log file',
+        ArgPropKey.HELP:        'Extract read group name - First token from a ":" delimited ReadGroup String',
         ArgPropKey.SHORT_FLAG:  '-xRG',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
         ArgPropKey.ACTION:      'store_true',
     },
+     # UARGS.NUMERIC_QERR_MODE: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
+    #     ArgPropKey.SHORT_FLAG:  '-num',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
+    # UARGS.NO_RELU: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
+    #     ArgPropKey.SHORT_FLAG:  '-nR',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
+        # UARGS.PROFILE_TYPE: {   # outfile 
+    #     ArgPropKey.DEFAULT:     "err_mean_and_freq",
+    #     ArgPropKey.TYPE:        str,
+    #     ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
+    #     ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
+    #     ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
+    #     ArgPropKey.SHORT_FLAG:  '-pt',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
+    # },
+    # UARGS.ARITHMETIC_MEAN: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
+    #     ArgPropKey.SHORT_FLAG:  '-aM',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
+        # UARGS.CONCAT_OLDER: {   # outfile 
+    #     ArgPropKey.DEFAULT:     None,
+    #     ArgPropKey.TYPE:        str,
+    #     ArgPropKey.HELP:        'Add (concatenate result) to older profile (EXISTING csv file)',
+    #     ArgPropKey.METAVAR:     '<*.csv>',
+    #     ArgPropKey.SHORT_FLAG:  '-a',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.CONCAT_OLDER,   
+    # },
 }
 
 
 
-BQ_STAT_PROFILER_DESC = "br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \
+BQ_STAT_PROFILER_DESC = f"br_stat_profiler (v{VERSION_NUMBER}) - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \
     "It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output for further processing."
 
 def complements_uargs_help_string(args_properties):  
@@ -422,7 +423,7 @@ def verify_outfile_csv(args):
 
 def check_min_max_cycle(args):
     if args.max_cyc - args.min_cyc < args.cyc_bin_count:
-        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). It cannont be divided into {args.cyc_bin_count} bins") 
+        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). \It cannont be divided into {args.cyc_bin_count} bins") 
     return
 
 def check_args(parser_args):
@@ -432,13 +433,14 @@ def check_args(parser_args):
     
     if not args_dict[UARGS.NO_LOG_FILE]:
         log_f = args_dict[UARGS.LOG_FILE]
-        [print(key,":",val, file=log_f) for key,val in args_dict.items()]
+        [print(key,":",val, file=log_f) for key, val in args_dict.items()]
+        print ("================================================", file=log_f)
         log_f.flush()
     # preform checks 
     check_int_scope(args_props, parser_args)
     verify_outfile_csv(parser_args)
-    if parser_args.concat_older: 
-        check_csv_file_exists(parser_args.concat_older)
+    # if parser_args.concat_older: 
+    #     check_csv_file_exists(parser_args.concat_older)
     check_min_max_cycle(parser_args)
     return parser_dict
 
@@ -446,8 +448,10 @@ def check_args(parser_args):
 def load_parser():
     args_props= get_global_args_properties()
     parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)
+    parser.add_argument('--version', action='version', version=f'Version: {VERSION_NUMBER}')
+    parser.set_defaults(version=VERSION_NUMBER)  # for the logging
     for _, props in args_props.items():
-        store_true = (props.get(ArgPropKey.ACTION) == 'store_true')
+        store_true = props.get(ArgPropKey.ACTION) == 'store_true'
         if store_true:
             parser_add_bool_arg(parser, props)    
         else:
@@ -457,15 +461,16 @@ def load_parser():
 if __name__ == "__main__":
     
     # # cmd = "--infile temp.txt --outfile test"
-    cmd = "--infile temp.txt --concat_older bla.csv"
+    # cmd = "--infile temp.txt --concat_older bla.csv"
+    cmd = "--infile temp.txt"
+    # cmd = "--version"
+    # cmd = "--help"
     # cmd = ""
     
-    parser = load_parser()  
+    parser = load_parser()
     args = parser.parse_args(cmd.split())
     check_args(args)
     args_dict = vars(args)
     # [print(key,":",val) for key,val in args_dict.items()] 
     # print(args_dict[UARGS.INFILE])
     parser.print_help()
-
-

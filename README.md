@@ -53,16 +53,17 @@ Below is a simplified version of the profiling algorithm per sample (=ReadGroup)
 
 ## Installation<a name="installation"></a>
 
-Straight forward, copy the 4 python files {br_stat_pfofiler.py, user_args.py, constants.py, wobble_utils.py} under the same directory
+(1) Create a directory named "br_stat_profiler" and (2) copy into it the following four python files {br_stat_pfofiler.py, user_args.py, constants.py, wobble_utils.py}.
 
 ## Usage<a name="usage"></a>
 
 ```plaintext
-usage: user_args.py [-h] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>] [-lg <*.* [stderr]>] [-a <*.csv>]
-                    [-mq <int min=1 [1]>] [-mxq <int max=100 [100]>] [-e <int between 1 and 10 [4]>]
-                    [-sb <int between 1 and 10 [4]>] [-cb <int between 1 and 15 [10]>] [-mic <int [1]>] [-mxc <int [150]>]
-                    [-nan <float [0]>] [-kN] [-nZ] [-ct <choices [cntxt]>] [-co <float [2]>] [-nW] [-wN <int [2]>]
-                    [-wRY <int [3]>] [-nL] [-xRG]
+usage: br_stat_profiler.py [-h] [--version] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>]
+                           [-lg <*.* [stderr]>] [-mq <int min=1 [1]>] [-mxq <int max=100 [100]>]
+                           [-e <int between 1 and 10 [4]>] [-sb <int between 1 and 10 [4]>]
+                           [-cb <int between 1 and 15 [10]>] [-mic <int [1]>] [-mxc <int [150]>] [-kN]
+                           [-nan <float [0]>] [-sym] [-nZ] [-ct <choices [cntxt]>] [-co <float [2]>] [-nW]
+                           [-wN <int [2]>] [-wRY <int [3]>] [-nL] [-xRG]
                            
 br_stat_profiler - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. 
 It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. 
@@ -70,15 +71,15 @@ The profiles can be saved in a CSV format or streamed as output for further proc
 
 options:
   -h, --help            show this help message and exit
+  --version             show program's version number and exit
   -i <GATKReport [stdin]>, --infile <GATKReport [stdin]>
-                        Path for file, or stdin with Existing GATK (v4.4.0.0) BaseRecalibrator report. (default=stdin)
+                        Path for file, or stdin with Existing GATK (v4.4.0.0) BaseRecalibrator report.
+                        (default=stdin)
   -o <*.csv [stdout]>, --outfile <*.csv [stdout]>
                         Path of NON-EXISTING .csv file for the generated profile. (default=stdout)
   -lg <*.* [stderr]>, --log_file <*.* [stderr]>
-                        NON-EXISTING file for profile metadata . (default=<_io.TextIOWrapper name='<stderr>' mode='w'
-                        encoding='utf-8'>)
-  -a <*.csv>, --concat_older <*.csv>
-                        Add (concatenate result) to older profile (EXISTING csv file)
+                        NON-EXISTING file for profile metadata . (default=<_io.TextIOWrapper
+                        name='<stderr>' mode='w' encoding='utf-8'>)
   -mq <int min=1 [1]>, --min_score <int min=1 [1]>
                         Minimal QualityScore value for profiling (default=1)
   -mxq <int max=100 [100]>, --max_score <int max=100 [100]>
@@ -86,34 +87,44 @@ options:
   -e <int between 1 and 10 [4]>, --min_err_observed <int between 1 and 10 [4]>
                         Minimal Number of Errornous Observations for profiling (default=100)
   -sb <int between 1 and 10 [4]>, --scr_bin_count <int between 1 and 10 [4]>
-                        # of bins of do divide the QualityScore values (The profiler further averages the QError rate in each
-                        bin). (default=4)
+                        # of bins of do divide the QualityScore values (The profiler further averages
+                        the QError rate in each bin). (default=4)
   -cb <int between 1 and 15 [10]>, --cyc_bin_count <int between 1 and 15 [10]>
-                        The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments thus
-                        QEerror is averaged for each fragment. (default=10)
+                        The # of bins to divide reading cycle covariate. That way reads are cut into
+                        equal fragments thus QEerror is averaged for each fragment. (default=10)
   -mic <int [1]>, --min_cyc <int [1]>
-                        In cycles profiling, first position along the read. Irrelevant for context profiling. (default=1)
+                        In cycles profiling, first position along the read. Irrelevant for context
+                        profiling. (default=1)
   -mxc <int [150]>, --max_cyc <int [150]>
-                        In cycles profiling, last position in the read. Irrelevant for context profiling. (default=150)
-  -nan <float [0]>, --nan_rep <float [0]>
-                        NaN representation for missing/cutoffed values, may be removed/imputed downstream (default=0)
+                        In cycles profiling, last position in the read. Irrelevant for context
+                        profiling. (default=150)
   -kN, --keep_nan_value
-                        Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise) (default=False)
+                        Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)
+                        (default=False)
+  -nan <float [0]>, --nan_rep <float [0]>
+                        NaN representation for missing/cutoffed values, may be removed/imputed
+                        downstream (default=0)
+  -sym, --qerr_cutoff_both_sides
+                        Symmetrical qerr cutoff. For example, for cutoff=3, QErrors below 3 and above -3
+                        are cut (default=False)
   -nZ, --no_zscore      Omit ZScoring in the final profile (default=False)
   -ct <choices [cntxt]>, --cov_type <choices [cntxt]>
-                        Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or both
-                        (context + cycle). options=['cntxt', 'cyc', 'cntxt_cyc'], (default=cntxt)
+                        Covariats type to profile QErrors. Profiling may take either the QErrors context
+                        or cycle or both (context + cycle). options=['cntxt', 'cyc', 'cntxt_cyc'],
+                        (default=cntxt)
   -co <float [2]>, --qerr_cutoff <float [2]>
                         Cutoff for Qerror (for removal of an hypothetical noise) (default=2)
   -nW, --no_wobble      Do not calculate statistics for k-mers with wobble position (N) (default=False)
   -wN <int [2]>, --max_wob_N_occ <int [2]>
-                        Maximal occurence of wobble positions N in the k-mers statistic calculation (default=2)
+                        Maximal occurence of wobble positions N in the k-mers statistic calculation
+                        (default=2)
   -wRY <int [3]>, --max_wob_R_Y_occ <int [3]>
-                        Maximal occurence of wobble positions R (Purins) and Y (Pyrmidins) in the k-mers statistic
-                        calculation (default=3)
+                        Maximal occurence of wobble positions R (Purins) and Y (Pyrmidins) in the k-mers
+                        statistic calculation (default=3)
   -nL, --no_log         Without log file (default=False)
   -xRG, --extract_read_group
-                        Without log file (default=False)
+                        Extract read group name - First token from a ":" delimited ReadGroup String
+                        (default=False)
 ```
 
 ### **Input**
