@@ -560,10 +560,13 @@ def extract_profile(stat_df, args_dict):
     q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
                                                   target_colname, RT2_STAT.ID_COL, add_id_prefix=False)
 
-    if not args_dict[UARGS.NO_ZSCORING]:  # Default !!!
+    if args_dict[UARGS.ZSCORING]:  # Default !!!
         q_err_profile = pd.DataFrame(scaler.fit_transform(q_err_profile),
                                      columns=q_err_profile.columns, index=q_err_profile.index)
-    if not args_dict[UARGS.KEEP_NAN_VALUE]:  # nan_rep == 0 by default
+    # if not args_dict[UARGS.KEEP_NAN_VALUE]:  # nan_rep == 0 by default
+    #     q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
+
+    if args_dict[UARGS.NAN_REP] != None:  # nan_rep == 0 by default
         q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
 
     return q_err_profile

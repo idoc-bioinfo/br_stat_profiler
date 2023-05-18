@@ -47,8 +47,8 @@ class UARGS:
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
-    KEEP_NAN_VALUE      =   "keep_nan_value"
-    NO_ZSCORING         =   "no_zscore" # True
+    # KEEP_NAN_VALUE      =   "keep_nan_value"
+    ZSCORING         =   "zscore" # True
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
     QERR_CUTOFF         =   "qerr_cutoff"
     QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
@@ -152,19 +152,19 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-mxc',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_CYC,
     },
-    UARGS.KEEP_NAN_VALUE: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
-        ArgPropKey.SHORT_FLAG:  '-kN',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
-        ArgPropKey.ACTION:      'store_true',
-    },
+    # UARGS.KEEP_NAN_VALUE: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
+    #     ArgPropKey.SHORT_FLAG:  '-kN',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
     UARGS.NAN_REP: {
-        ArgPropKey.DEFAULT:     0,
+        ArgPropKey.DEFAULT:     None,
         ArgPropKey.TYPE:        float,
         ArgPropKey.HELP:        'NaN representation for missing/cutoffed values, may be removed/imputed downstream',
-        ArgPropKey.METAVAR:     '<float [0]>',
+        ArgPropKey.METAVAR:     '<float [None]>',
         ArgPropKey.SHORT_FLAG:  '-nan',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NAN_REP,
     },
@@ -176,12 +176,12 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.QERR_SYM_CUTOFF,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.NO_ZSCORING: {
+    UARGS.ZSCORING: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Omit ZScoring in the final profile',
-        ArgPropKey.SHORT_FLAG:  '-nZ',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_ZSCORING,
+        ArgPropKey.HELP:        'ZScoring the final profile (after the qerr cuttoff if requested). None values are ignored',
+        ArgPropKey.SHORT_FLAG:  '-z',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.ZSCORING,
         ArgPropKey.ACTION:      'store_true',
     },
     UARGS.COV_TYPE: {   # outfile 
@@ -194,7 +194,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
     },
     UARGS.QERR_CUTOFF: {
-        ArgPropKey.DEFAULT: 2,
+        ArgPropKey.DEFAULT: -20,
         ArgPropKey.TYPE: float,
         # ArgPropKey.MIN: -10,
         ArgPropKey.HELP:        'Cutoff for Qerror (for removal of an hypothetical noise)',
@@ -458,14 +458,11 @@ def load_parser():
             parser_add_arg(parser, props)
     return parser
    
-if __name__ == "__main__":
-    
-    # # cmd = "--infile temp.txt --outfile test"
+if __name__ == "__main__": 
     # cmd = "--infile temp.txt --concat_older bla.csv"
     cmd = "--infile temp.txt"
     # cmd = "--version"
-    # cmd = "--help"
-    # cmd = ""
+
     
     parser = load_parser()
     args = parser.parse_args(cmd.split())
