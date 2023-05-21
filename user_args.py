@@ -18,7 +18,7 @@ class ArgPropKey(StrEnum):
     LONG_FLAG   =   'long_flag'
     NARGS       =   'nargs'
     ACTION      =   'action'
-    VERSION     = 'version'
+    VERSION     =   'version'
    
 # draft_prop = {
 #     ArgPropKey.DEFAULT: 10,
@@ -37,6 +37,7 @@ class ArgPropKey(StrEnum):
 VERSION_NUMBER='1.0'
 
 class UARGS:
+    """ User Arguments"""
     INFILE              =   "infile"
     OUTFILE             =   "outfile"
     SCORE_BINS_COUNT    =   "scr_bin_count"
@@ -47,8 +48,7 @@ class UARGS:
     MAX_CYC             =   "max_cyc"  
     MIN_CYC             =   "min_cyc"
     NAN_REP             =   "nan_rep" 
-    # KEEP_NAN_VALUE      =   "keep_nan_value"
-    ZSCORING         =   "zscore" # True
+    ZSCORING            =   "zscore"        # True
     COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
     QERR_CUTOFF         =   "qerr_cutoff"
     QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
@@ -58,15 +58,10 @@ class UARGS:
     NO_LOG_FILE         =   "no_log"
     LOG_FILE            =   "log_file"
     EXTRACT_READ_GROUP  =   "extract_read_group"
-    # depracted
-    # NUMERIC_QERR_MODE   =  "numeric_qerr_mode" 
-    # NO_RELU             =   "no_ReLU"          
-    # PROFILE_TYPE        =   "profile_type"  #"err_freq" # {"err", "freq" , "err_freq"}
-    # ARITHMETIC_MEAN     =   "arithmetic_mean"   
-    # CONCAT_OLDER        =   "concat_older"
-
+    
      
 class PRVT_ARG:      # private arguments
+    """Private arguments"""
     MM_CNTXT_SIZE       =   "mm_cntxt_size"   # argument if filled duting  analysis
 
 ARGS_PROPERTIES = {
@@ -115,7 +110,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.HELP:    'Minimal Number of Errornous Observations for profiling',
-        ArgPropKey.SHORT_FLAG: '-e',
+        ArgPropKey.SHORT_FLAG: '-eo',
         ArgPropKey.LONG_FLAG:'--' + UARGS.MIN_ERR_OBSRV,
     },
     UARGS.SCORE_BINS_COUNT: {
@@ -123,7 +118,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.MAX:     10,
-        ArgPropKey.HELP:    '# of bins of do divide the QualityScore values (The profiler further averages the QError rate in each bin).',
+        ArgPropKey.HELP:    '# of bins to divide the QualityScore values (The profiler further averages the QError rate in each bin).',
         ArgPropKey.SHORT_FLAG: '-sb',
         ArgPropKey.LONG_FLAG:   '--'+ UARGS.SCORE_BINS_COUNT,
     },
@@ -132,14 +127,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.TYPE: int,
         ArgPropKey.MIN: 1,
         ArgPropKey.MAX: 15,
-        ArgPropKey.HELP: 'The # of bins to divide reading cycle covariate. That way reads are cut into equal fragments thus QEerror is averaged for each fragment.',
+        ArgPropKey.HELP: 'The # of bins to divide reading cycle covariate so that reads are cut into equal fragments. QEerror is averaged for each cycle bin (=fragment).',
         ArgPropKey.SHORT_FLAG: '-cb',
         ArgPropKey.LONG_FLAG: '--' + UARGS.CYC_BINS_COUNT,
     },
     UARGS.MIN_CYC: {
         ArgPropKey.DEFAULT: 1,
         ArgPropKey.TYPE: int,
-        ArgPropKey.HELP: 'In cycles profiling, first position along the read. Irrelevant for context profiling.',
+        ArgPropKey.HELP: 'In cycles profiling, The start position in the read. Irrelevant for context profiling.',
         ArgPropKey.METAVAR: '<int [1]>',
         ArgPropKey.SHORT_FLAG: '-mic',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MIN_CYC,
@@ -152,18 +147,10 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG: '-mxc',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_CYC,
     },
-    # UARGS.KEEP_NAN_VALUE: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'Keep missing/cutoffed values as NaN (0 by default or use --nan to set otherwise)',
-    #     ArgPropKey.SHORT_FLAG:  '-kN',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.KEEP_NAN_VALUE,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
     UARGS.NAN_REP: {
         ArgPropKey.DEFAULT:     None,
         ArgPropKey.TYPE:        float,
-        ArgPropKey.HELP:        'NaN representation for missing/cutoffed values, may be removed/imputed downstream',
+        ArgPropKey.HELP:        'Optional Character filler for missing/cutoffed values.',
         ArgPropKey.METAVAR:     '<float [None]>',
         ArgPropKey.SHORT_FLAG:  '-nan',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NAN_REP,
@@ -179,7 +166,7 @@ ARGS_PROPERTIES = {
     UARGS.ZSCORING: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'ZScoring the final profile (after the qerr cuttoff if requested). None values are ignored',
+        ArgPropKey.HELP:        'ZScoring the final profile (preformed after the QErr cuttoff if requested). None values are ignored',
         ArgPropKey.SHORT_FLAG:  '-z',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.ZSCORING,
         ArgPropKey.ACTION:      'store_true',
@@ -196,16 +183,15 @@ ARGS_PROPERTIES = {
     UARGS.QERR_CUTOFF: {
         ArgPropKey.DEFAULT: -20,
         ArgPropKey.TYPE: float,
-        # ArgPropKey.MIN: -10,
         ArgPropKey.HELP:        'Cutoff for Qerror (for removal of an hypothetical noise)',
         ArgPropKey.SHORT_FLAG:  '-co',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.QERR_CUTOFF,
-        ArgPropKey.METAVAR:     '<' + 'float [2]' + '>',
+        ArgPropKey.METAVAR:     '<' + 'float [-20]' + '>',
     },
     UARGS.NO_WOBBLE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Do not calculate statistics for k-mers with wobble position (N)',
+        ArgPropKey.HELP:        'Do not indluce wobbled k-mers statistics {N, R, Y}',
         ArgPropKey.SHORT_FLAG:  '-nW',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_WOBBLE,
         ArgPropKey.ACTION:      'store_true',
@@ -213,7 +199,6 @@ ARGS_PROPERTIES = {
     UARGS.MAX_WOB_N_OCC: {
         ArgPropKey.DEFAULT:     2,
         ArgPropKey.TYPE:        int,
-        # ArgPropKey.MIN:         1,
         ArgPropKey.HELP:        'Maximal occurence of wobble positions N in the k-mers statistic calculation',
         ArgPropKey.SHORT_FLAG: '-wN',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_N_OCC,
@@ -222,7 +207,6 @@ ARGS_PROPERTIES = {
     UARGS.MAX_WOB_R_Y_OCC: {
         ArgPropKey.DEFAULT:     3,
         ArgPropKey.TYPE:        int,
-        # ArgPropKey.MIN:          1,
         ArgPropKey.HELP:        'Maximal occurence of wobble positions R (Purins) and Y (Pyrmidins) in the k-mers statistic calculation',
         ArgPropKey.SHORT_FLAG: '-wRY',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_R_Y_OCC,
@@ -231,7 +215,7 @@ ARGS_PROPERTIES = {
     UARGS.NO_LOG_FILE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Without log file',
+        ArgPropKey.HELP:        'Without log file or stderr',
         ArgPropKey.SHORT_FLAG:  '-nL',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_LOG_FILE,
         ArgPropKey.ACTION:      'store_true',
@@ -239,52 +223,11 @@ ARGS_PROPERTIES = {
     UARGS.EXTRACT_READ_GROUP: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Extract read group name - First token from a ":" delimited ReadGroup String',
+        ArgPropKey.HELP:        'Extract read group name - from a ":" delimited ReadGroup String (first token)',
         ArgPropKey.SHORT_FLAG:  '-xRG',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
         ArgPropKey.ACTION:      'store_true',
     },
-     # UARGS.NUMERIC_QERR_MODE: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'The Phred errors are converted to numeric values.',
-    #     ArgPropKey.SHORT_FLAG:  '-num',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NUMERIC_QERR_MODE,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
-    # UARGS.NO_RELU: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'Errors undergoes ReLU filter ',
-    #     ArgPropKey.SHORT_FLAG:  '-nR',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_RELU,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
-        # UARGS.PROFILE_TYPE: {   # outfile 
-    #     ArgPropKey.DEFAULT:     "err_mean_and_freq",
-    #     ArgPropKey.TYPE:        str,
-    #     ArgPropKey.CHOICES:     ["err_mean", "freq" , "err_mean_and_freq"],
-    #     ArgPropKey.HELP:        'Profile may include calculation of average QError and/or frequency per covariance (context or cycle).',
-    #     ArgPropKey.METAVAR:     '<' + UARGS.PROFILE_TYPE + '>',
-    #     ArgPropKey.SHORT_FLAG:  '-pt',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.PROFILE_TYPE,   
-    # },
-    # UARGS.ARITHMETIC_MEAN: {
-    #     ArgPropKey.DEFAULT:     False,
-    #     ArgPropKey.TYPE:        None,
-    #     ArgPropKey.HELP:        'Arithmetic mean instead of weighted mean.',
-    #     ArgPropKey.SHORT_FLAG:  '-aM',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.ARITHMETIC_MEAN,
-    #     ArgPropKey.ACTION:      'store_true',
-    # },
-        # UARGS.CONCAT_OLDER: {   # outfile 
-    #     ArgPropKey.DEFAULT:     None,
-    #     ArgPropKey.TYPE:        str,
-    #     ArgPropKey.HELP:        'Add (concatenate result) to older profile (EXISTING csv file)',
-    #     ArgPropKey.METAVAR:     '<*.csv>',
-    #     ArgPropKey.SHORT_FLAG:  '-a',
-    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.CONCAT_OLDER,   
-    # },
 }
 
 
@@ -301,8 +244,8 @@ def complements_uargs_help_string(args_properties):
     Returns:
         dict: user arguments with added help strings
     """    
-    
-    for key, _ in args_properties.items():
+    # looping over the args properties
+    for key in args_properties:
         # default_val = args_properties[key][ArgPropKey.DEFAULT]
         choices = args_properties[key].get(ArgPropKey.CHOICES)
         current_help = args_properties[key][ArgPropKey.HELP]
@@ -326,7 +269,14 @@ def complements_uargs_help_string(args_properties):
         
         
 def complete_uargs_metavar_info(args_properties):
-        
+    """add metavar info according to the MIN, Max and DEFAULT parameters
+
+    Args:
+        args_properties (dict):user arguments
+
+    Returns:
+        dict: user arguments with added metavar string
+    """        
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
         f'<int min={args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]} [{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
     
@@ -342,19 +292,17 @@ def complete_uargs_metavar_info(args_properties):
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
         f'<int between {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
     
-    # args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.METAVAR] = \
-    #     f'<int min={args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.MIN]} [{args_properties[UARGS.MAX_WOBBLE_OCC][ArgPropKey.DEFAULT]}]>'
-
     return args_properties
 
+# preparation of argument default
 global_args_props = complete_uargs_metavar_info(ARGS_PROPERTIES)
-
 global_args_props = complements_uargs_help_string(ARGS_PROPERTIES)
 
 def get_global_args_properties():
     return global_args_props
 
 def parser_add_arg(parser, props):
+    """ loading a user properties with default values"""
     parser.add_argument(props.get(ArgPropKey.SHORT_FLAG), 
         props[ArgPropKey.LONG_FLAG],
         default =   props.get(ArgPropKey.DEFAULT),
@@ -367,6 +315,7 @@ def parser_add_arg(parser, props):
     )
 
 def parser_add_bool_arg(parser,props):
+    """"loading a boolean argument (without metavar and type properties)"""
     parser.add_argument(props.get(ArgPropKey.SHORT_FLAG), 
         props[ArgPropKey.LONG_FLAG],
         default =   props.get(ArgPropKey.DEFAULT),
@@ -403,18 +352,12 @@ def check_int_scope(arg_props, parser_args):
                 raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")        
     return
 
-def check_csv_file_exists(filename):
-    if not os.path.exists(filename): # missing filename
-        raise argparse.ArgumentError(None, "concat_older=True but older profile is missing")
-    # check file in csv format
-    if os.path.splitext(filename)[1].lower() != '.csv': # wrong format
-        raise argparse.ArgumentError(None, f"older profile {filename} is not in .csv format")     
-    return
-
 def verify_outfile_csv(args):
+    """add to outfile csv extension if needed"""
     filename = args.outfile.name
     if filename  == 'stdout' or filename == '<stdout>':
         return
+    # add "csv' extension if needed
     _, ext = os.path.splitext(filename) # extract extension string
     if ext != ".csv":  # add csv extension and open file 
         args.outfile = open(f"{filename}.csv", "x")
@@ -422,18 +365,20 @@ def verify_outfile_csv(args):
     return
 
 def check_min_max_cycle(args):
+    """ verify the min and max cycle do overlaps"""
     if args.max_cyc - args.min_cyc < args.cyc_bin_count:
         raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). \It cannont be divided into {args.cyc_bin_count} bins") 
     return
 
 def check_args(parser_args):
+    """ Preform all the user args checks"""
     args_props= get_global_args_properties()
-    parser_dict = vars(parser_args) # parser
-    args_dict = vars(parser_args) 
+    parser_dict = vars(parser_args) # arguments to dictionary
+    # args_dict = vars(parser_args) 
     
-    if not args_dict[UARGS.NO_LOG_FILE]:
-        log_f = args_dict[UARGS.LOG_FILE]
-        [print(key,":",val, file=log_f) for key, val in args_dict.items()]
+    if not parser_dict[UARGS.NO_LOG_FILE]: # dump arguments to logfile
+        log_f = parser_dict[UARGS.LOG_FILE]
+        [print(key,":",val, file=log_f) for key, val in parser_dict.items()]
         print ("================================================", file=log_f)
         log_f.flush()
     # preform checks 
@@ -446,10 +391,14 @@ def check_args(parser_args):
 
 # returns loaded parser
 def load_parser():
+    """ loading user argument into parser (before parsing)"""
     args_props= get_global_args_properties()
-    parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)
+    # add description
+    parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)   
+    # add version
     parser.add_argument('--version', action='version', version=f'Version: {VERSION_NUMBER}')
     parser.set_defaults(version=VERSION_NUMBER)  # for the logging
+    # add user args
     for _, props in args_props.items():
         store_true = props.get(ArgPropKey.ACTION) == 'store_true'
         if store_true:

@@ -61,17 +61,10 @@ class RT2_STAT:
     BIN_AVG_QLTY_SCORE_COL      = "BinAvgQltyScore"
     BIN_AVG_QLTY_ERR_COL        = "BinAvgQltyErr"
     
-    # RG_SCR_BINS_COV_N_COL       = "RG_ScrBin_COV_N"
-    # RG_SCR_BIN_N_COL            = "RG_ScrBin_N"      
-    # QLTY_ERR_W_AVG_COL          = "QErrWeightedAvg"
     ID_COL                      = "ID"
     ID_DELIM                    = ":"
     COV_TYPE_COL_IDX            = 2
     
-    # FREQ_IN_RG_COL        = "FreqInRG"            deprecated   
-    # FREQ_IN_RG_BIN_COL    = "FreqInRG_ScrBin"     deprecated
-    # MM_CONTXT_SIZE        = 4                     deprecated
-
 # Stat Auxiliary Table to calculate cycles statistics
 class CYC_RT2:
     CYC_COL             = RC_TAB2.CYC_COV
