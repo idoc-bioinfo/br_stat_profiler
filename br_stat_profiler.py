@@ -9,8 +9,9 @@ from sklearn.preprocessing import StandardScaler
 from constants import RT_HDR, ARG_TAB, RC_TAB1, RC_TAB2, CYC_RT2, RT2_STAT
 # from usr_props import UserProperties
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
-from wobble_utils import WobbleUtil, add_wobble_data
-HARVEST_LOG_ROW_COUNT = 5000
+from wobble_utils import WobbleUtil, get_wobble_data
+from log_utils import logger
+LOG_HARVEST_ROW_COUNT = 5000
 
 
 def create_dtype_dict(formats_list):
@@ -34,7 +35,7 @@ def create_dtype_dict(formats_list):
                 dtype_dict[substring] = int
     return dtype_dict
 
-def harvest_recal_table(args_dict):
+def harvest_recal_tables(args_dict):
     """ Reads all the tables in a GATK (V4.4.0.0) BaseRecalibrator Report into Dataframes
 
     Args:
@@ -45,7 +46,6 @@ def harvest_recal_table(args_dict):
         The index name is the Table name as appears in the GATK Report
     """
     in_wrapper = args_dict[UARGS.INFILE]
-    log_f = args_dict[UARGS.LOG_FILE]
 
     # the result list to collect the harvested tables
     harveseted_tables = pd.Series(dtype='object')
@@ -82,19 +82,14 @@ def harvest_recal_table(args_dict):
             coltypes = [types_dict[t] for t in col_types]
             col_dict = dict(zip(cols, coltypes))
             df = pd.DataFrame(columns=col_dict.keys()).astype(col_dict)
-            
-            if not args_dict[UARGS.NO_LOG_FILE]:
-                print(f"> Harvesting {table_name}, {row_count} rows", file=log_f)
-                log_f.flush()
+            logger.info(f"Harvesting {table_name}, {row_count} rows")
             row_num = 0
             for i in range(0, row_count):
                 line = iw_f.readline()
 
                 row_num += 1
-                if (row_num % HARVEST_LOG_ROW_COUNT) == 0:
-                    if not args_dict[UARGS.NO_LOG_FILE]:
-                        print(f"    row {row_num} ({row_num/row_count:.1%})", file=log_f)
-                        log_f.flush()
+                if row_num % LOG_HARVEST_ROW_COUNT == 0:
+                    logger.info(f"\trow {row_num} ({row_num/row_count:.1%})")
     
                 df.loc[i] = line.rstrip().split()
             
@@ -103,10 +98,7 @@ def harvest_recal_table(args_dict):
             # add the harvested dataframe with its name as index
             harveseted_tables[table_name] = df
     
-    if not args_dict[UARGS.NO_LOG_FILE]:
-        print("\\--------------- Harvest Finished ----------------/", file=log_f)
-        log_f.flush()
-    
+    logger.info("\\--------------- Harvest Finished ----------------/")
     return harveseted_tables
 
 
@@ -253,7 +245,7 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
                          RC_TAB2.ERR_OBSERV_COL: RT2_STAT.BIN_ERR_OBSRV_SUM_COL}) \
         .reset_index()
 
-    # Calculate Empyrical collective error (Phred formula)
+    # Calculate Empirical collective error (Phred formula)
     grp_emp_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
         -10 * np.log10(grp_emp_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL]
                        / grp_emp_score_df[RT2_STAT.BIN_OBS_SUM_COL])
@@ -396,10 +388,18 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
             full_library = [''.join(comb) for comb in combinations]
         else:  # with woble
             # full_library = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict, only_with_wob=False)
-            full_library = WobbleUtil.get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
+            full_library = WobbleUtil.get_full_wobbled_k_mers_list(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
                                                          args_dict[UARGS.MAX_WOB_N_OCC],
                                                          args_dict[UARGS.MAX_WOB_R_Y_OCC],
-                                                         only_with_wob=False)
+                                                         args_dict[UARGS.MAX_WOB_M_S_W_OCC],
+                                                         args_dict[UARGS.MAX_WOB_B_D_H_V_OCC])
+
+            # full_library = WobbleUtil.get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
+            #                                              args_dict[UARGS.MAX_WOB_N_OCC],
+            #                                              args_dict[UARGS.MAX_WOB_R_Y_OCC],
+            #                                              args_dict[UARGS.MAX_WOB_M_S_W_OCC],
+            #                                              args_dict[UARGS.MAX_WOB_B_D_H_V_OCC],
+            #                                              only_with_wob=False)
 
     # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
@@ -407,8 +407,13 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
     # add wooble position statistics if needed
     # preform wobble
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
-        rt2_stat_df = add_wobble_data(rt2_stat_df, args_dict)
-
+        wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
+        # rt2_stat_df = get_wobble_data(rt2_stat_df, full_library, args_dict)
+        # rt2_stat_df = add_wobble_data(rt2_stat_df, full_library, args_dict)
+        rt2_stat_df = pd.concat([rt2_stat_df,
+                               get_wobble_data(rt2_stat_df, wobbled_k_mers, args_dict)
+                               ])
+        # return pd.concat([stat_df] + wob_df_list)   
     # remove statistics QErr values below cutoff (optional)
     if args_dict[UARGS.QERR_SYM_CUTOFF]:
         rt2_stat_df = rt2_stat_df[ abs(rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >=  args_dict[UARGS.QERR_CUTOFF] ]
@@ -422,7 +427,7 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
 
     # generate uniform order before profile extraction
     rt2_stat_df = rt2_stat_df.sort_values( by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
-
+    logger.info("prepare_stat_df finished")
     return rt2_stat_df
 
 def preprocess_GATK_report(args_dict):
@@ -438,7 +443,7 @@ def preprocess_GATK_report(args_dict):
         pd.Dataframe: preprocessed RecalTable1
     """
 
-    GATKTables = harvest_recal_table(args_dict)
+    GATKTables = harvest_recal_tables(args_dict)
     # fetch the mismatch context size argument from the GATKReport (Argument table)
     args_df = GATKTables[ARG_TAB.NAME]
     args_dict[PRVT_ARG.MM_CNTXT_SIZE] = int(
@@ -517,7 +522,7 @@ def extract_profile(stat_df, args_dict):
     return q_err_profile
 
 
-def profile_rt(pre_stat_df, args_dict):
+def _profile_rt(pre_stat_df, args_dict):
     """
     Extracts profiles form the stat table.
     The exracted profiles are optionally zscored 
@@ -551,6 +556,12 @@ def profile_rt(pre_stat_df, args_dict):
     # args_dict[UARGS.COV_TYPE] == "cntxt_cyc"
     return pd.concat([cntxt_profile, cyc_profile])
 
+def profile_rt(pre_stat_df, args_dict):
+    ready_profile = _profile_rt(pre_stat_df, args_dict)
+    logger.info("br_stat_profiler finished!!!")
+    return ready_profile
+
+
 if __name__ == "__main__":
     parser = load_parser()
     # testing  code
@@ -558,9 +569,9 @@ if __name__ == "__main__":
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
     # REC_TAB_FULL_PATH = \
     #     RECAL_TABLE_DIR + "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -ct cyc"
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -ct cyc -lg log.txt"
     # args = parser.parse_args(cmd.split())
-    # ################### PRODUCTTION ############################
+    ################### PRODUCTTION ############################
     args = parser.parse_args()
     # ============================================================
 

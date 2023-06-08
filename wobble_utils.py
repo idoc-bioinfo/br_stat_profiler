@@ -1,17 +1,27 @@
 import itertools, re, math
 import numpy as np
 import pandas as pd
+import swifter
 
 from user_args import PRVT_ARG, UARGS
 from constants import RT2_STAT, RC_TAB2
+from log_utils import logger
+
+REPORT_WOBBLES_PROGRESS = 2500
+
 class WobbleUtil:
     patterns_dict = {
-        'N':   '.',
-        'R':   '[AG]',
-        'Y':   '[TC]',
-        #  'W':   '[AT]',
-        #  'S':   '[CG]',
-        #  'M':   '[AC]',
+        'N':    '.',
+        'R':    '[AG]',
+        'Y':    '[TC]',
+        'W':    '[AT]',
+        'S':    '[CG]',
+        'M':    '[AC]', 
+        'K':    '[GT]',
+        'B':    '[CGT]',
+        'D':    '[AGT]',
+        'H':    '[ACT]',
+        'V':    '[ACG]',       
     } 
 
     def match_k_mer(wobbled_k_mer, k_mer):
@@ -33,7 +43,7 @@ class WobbleUtil:
         return bool(re.match(pattern, k_mer))
     
     def has_any(tested_str: str):
-        """Check if k-mer for wobble positions """
+        """Check if k-mer has wobble positions """
         for wob in WobbleUtil.patterns_dict:
             if wob in tested_str:
                 return True
@@ -47,32 +57,53 @@ class WobbleUtil:
         """Counts 'R' and 'Y' number combined """
         return (tested_str.count('R') + tested_str.count('Y'))
    
+    def count_M_S_W_occ(tested_str: str):
+        """Counts 'M' and 'S' and 'W' number combined """
+        return (tested_str.count('M') + tested_str.count('S')+ tested_str.count('W'))
 
+    def count_B_D_H_V_occ(tested_str: str):
+        """Counts 'B' and 'D' and 'V' number combined """
+        return (tested_str.count('B') + tested_str.count('D') + \
+            tested_str.count('H') + tested_str.count('V'))
 
-    # def get_wobbled_k_mers(K, args_dict, only_with_wob=False):
-    def get_wobbled_k_mers(K, max_wob_N_occ, max_wob_R_Y_occ, only_with_wob=False):
-        """get list of k-mers with the indicated wobbles position"
+    
+    def get_full_wobbled_k_mers_list(K,
+                                     max_wob_N_occ,
+                                     max_wob_R_Y_occ,
+                                     max_wob_M_S_W_occ,
+                                     max_wob_B_D_H_V_occ):
+               
+        """
+        get list of k-mers with the indicated wobbles position
         Args:
-            K (int):                K value (K-mer length)
-            max_wob_N_occ (int):    maximum number of N wobble bases to include
-            max_wob_R_Y_occ (int):  maximum number of R and Y wobble bases combined
-            only_with_wob (bool, optional): returns only k-mers with wobble positsion (default= False).
+            K (int):                   K value (K-mer length)
+            max_wob_N_occ (int):       maximum number of N wobble bases to include
+            max_wob_R_Y_occ (int):     maximum number of R and Y wobble bases combined
+            max_wob_M_S_W_occ (int):    maximum number of M, S and W wobble bases combined
+            max_wob_B_D_H_V_occ(int):   maximum number of B, D, H and V wobble bases combined
         Returns:
             list: list of k-mers (str)
-        """    
-        # prepare list of k-mers
-        wobble_combinations = list(itertools.product(['A', 'C', 'G', 'T', 'N', 'R','Y'], repeat=K))
+        """
+        logger.info("get_full_wobbled_k_mers_list: starting")
+        wobble_combinations = list(itertools.product(['A', 'C', 'G', 'T', 'N', 'R','Y', \
+                                                      'M', 'S', 'W', 'B', 'D', 'H', 'V'], repeat=K))
         wobble_str_lst = [''.join(comb) for comb in wobble_combinations]
-        # filter out k-mers with wobbles position above threshold values
-        filtered_wob_string = [
+        filtered_wob_strings = [
             s for s in wobble_str_lst \
                 if (WobbleUtil.count_N_occ(s) <= max_wob_N_occ) and \
-                    (WobbleUtil.count_R_Y_occ(s) <= max_wob_R_Y_occ) 
+                    (WobbleUtil.count_R_Y_occ(s) <= max_wob_R_Y_occ) and \
+                    (WobbleUtil.count_M_S_W_occ(s) <= max_wob_M_S_W_occ) and \
+                    (WobbleUtil.count_B_D_H_V_occ(s) <= max_wob_B_D_H_V_occ) 
             ]
-        
-        if only_with_wob:  # filter out k-mers without wooble position at all
-            filtered_wob_string = [s for s in filtered_wob_string if WobbleUtil.has_any(s)]
-        return filtered_wob_string
+        logger.info(f"get_full_wobbled_k_mers_list: list ready (len={len(filtered_wob_strings)})")
+        return filtered_wob_strings
+    
+    def remove_non_wobble(k_mer_list):
+        logger.info("add_wobble_data: removing non-wobbled k_mers")
+        non_wobled_k_mers = [s for s in k_mer_list if WobbleUtil.has_any(s)]
+        logger.info(f"add_wobble_data: non-wobbled k_mer removed (len={len(non_wobled_k_mers)})")
+        return non_wobled_k_mers
+
 
 
 def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNTXT_COV):
@@ -83,11 +114,10 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
         wobbled_k_mer (str):            wobbled_k_mer
         cov_type (str, optional):       the covariate type (currently only one option). 
         Defaults to RC_TAB2.CNTXT_COV.
-
     Returns:
         pd.Dataframe: table with the calculated statistics
-    """    
-    # calculate weighted average of pvalues
+    """  
+    # calculate weighted average of pvalues    
     wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL]) \
         .apply(lambda x: np.average(
             x[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].astype(float),
@@ -95,11 +125,16 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
                                             .reset_index().rename(
                                                 columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
     # convert calculated pvalues to score
+    # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+    #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
+    #         .apply(lambda x: -10 * math.log10(x))  
     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-            wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(lambda x: -10 * math.log10(x))                                        
-
+        wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
+            .apply(lambda x: -10 * math.log10(x))                                        
+    
+    wob_temp_score = pd.DataFrame()  
     # summerize the observations and errors
-    wob_emp_score = specific_wob_df.groupby(
+    wob_temp_score = specific_wob_df.groupby(
         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
             [[RT2_STAT.BIN_OBS_SUM_COL, RT2_STAT.BIN_ERR_OBSRV_SUM_COL]]\
             .sum() \
@@ -107,13 +142,13 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
                                 RC_TAB2.ERR_OBSERV_COL:RT2_STAT.BIN_ERR_OBSRV_SUM_COL})\
                                     .reset_index()
     
-    # calculate empyrical collective error (phred formula)
-    wob_emp_score[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
-        -10 * np.log10(wob_emp_score[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-            / wob_emp_score[RT2_STAT.BIN_OBS_SUM_COL])                                
+    # calculate empirical collective error (phred formula)
+    wob_temp_score[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+        -10 * np.log10(wob_temp_score[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
+            / wob_temp_score[RT2_STAT.BIN_OBS_SUM_COL])                                
     
     # merge data into a new dataframe            
-    wob_temp_df = pd.merge(wob_score_df, wob_emp_score,
+    wob_temp_df = pd.merge(wob_score_df, wob_temp_score,
                     on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])
 
     # Calculate QError
@@ -122,43 +157,50 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
     
     # Add column with the wobbled k_mer value        
     wob_temp_df.insert(RT2_STAT.COV_TYPE_COL_IDX,cov_type, wobbled_k_mer)
+    # logger.info("calculate_wobble_stat - End")
     return wob_temp_df
 
 
-def add_wobble_data(stat_df, args_dict):
+def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
+    # logger.info("add_wobble_data -starting")
     """Calculates statistics for all the wobbled k-mers and concatenate it alltogether
 
     Args:
         stat_df (pd.Dataframe): statistics for non_wobbled data
+        wobbled_k_mers_list (list): list of only wobbled k-mers
         args_dict (dict): user arguments
 
     Returns:
         pd.Dataframe: combined table with non_wobbled and wobbled data
     """        
-    # wobbled_k_mers = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict, only_with_wob=True)
-    wobbled_k_mers = WobbleUtil.get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], 
-                                        args_dict[UARGS.MAX_WOB_N_OCC], 
-                                        args_dict[UARGS.MAX_WOB_R_Y_OCC],
-                                        only_with_wob=True)
-    wob_stat_df = pd.DataFrame()
-    first_time = True
+    logger.info("get_wobble_data: start")
+    # wobbled_k_mers = WobbleUtil.remove_non_wobble(k_mers_list)
+    wobbled_k_mer_count = len(wobbled_k_mers_list)
+    
     # looping over all the woobled k-mer 
-    for wob_k_mer in wobbled_k_mers:
+    wob_df_list = []
+    for i,wob_k_mer in enumerate(wobbled_k_mers_list):
+        
         if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:   # It should never happen in a real world scenario (only in testing)
             continue
         
         # extract the rows with k-mers that matches the wob_k_mer of interest
-        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
+        # wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
+        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].swifter.progress_bar(False)\
+            .apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
+        
         if wob_df.empty:   # no rows with wob_k_mer matching
             continue
         
         #calculate the statistics of the wob_k_mer of interests 
-        temp_wob_df = calculate_wobble_stat(wob_df, wob_k_mer, cov_type = RC_TAB2.CNTXT_COV)
+        temp_wob_df = pd.DataFrame(
+            calculate_wobble_stat(wob_df.copy(), wob_k_mer, cov_type = RC_TAB2.CNTXT_COV)
+        )
+        
+        wob_df_list.append(temp_wob_df)
+        
+        if (i+1) % REPORT_WOBBLES_PROGRESS == 0:
+            logger.info(f"get_wobble_data: wobbled_k_mer {i} ({(i+1)/wobbled_k_mer_count:.1%})")
+    # return pd.concat([stat_df] + wob_df_list) 
+    return pd.concat(wob_df_list) 
 
-        if first_time: # new dataframe in the first time
-            wob_stat_df = temp_wob_df.copy()
-            first_time = False
-        else: # otherwise, concat calculated sstatistics for each wobbled k_mer
-            wob_stat_df = pd.concat([wob_stat_df, temp_wob_df])
-    # concat the woobled stat data with the non-wobble stat data
-    return pd.concat([stat_df,wob_stat_df]) 

@@ -1,7 +1,9 @@
+import logging
 import sys
 import argparse
 import os
 from enum import Enum
+from log_utils import initialize_logger, logger
 
 class StrEnum(str, Enum):
     pass
@@ -34,7 +36,7 @@ class ArgPropKey(StrEnum):
 #     ArgPropKey.ACTION:  None, # store_true
 # }
 
-VERSION_NUMBER='1.0'
+VERSION_NUMBER='1.1'
 
 class UARGS:
     """ User Arguments"""
@@ -55,7 +57,9 @@ class UARGS:
     NO_WOBBLE           =   "no_wobble"
     MAX_WOB_N_OCC       =   "max_wob_N_occ"
     MAX_WOB_R_Y_OCC     =   "max_wob_R_Y_occ"
-    NO_LOG_FILE         =   "no_log"
+    MAX_WOB_M_S_W_OCC   =   "max_wob_M_S_W_occ"
+    MAX_WOB_B_D_H_V_OCC =   "max_wob_B_D_H_V_occ"
+    VERBOSE             =   "verbose"
     LOG_FILE            =   "log_file"
     EXTRACT_READ_GROUP  =   "extract_read_group"
     
@@ -171,7 +175,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.ZSCORING,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.COV_TYPE: {   # outfile 
+    UARGS.COV_TYPE: { 
         ArgPropKey.DEFAULT:     "cntxt",
         ArgPropKey.TYPE:        str,
         ArgPropKey.CHOICES:     ["cntxt", "cyc", "cntxt_cyc"],
@@ -191,7 +195,7 @@ ARGS_PROPERTIES = {
     UARGS.NO_WOBBLE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Do not indluce wobbled k-mers statistics {N, R, Y}',
+        ArgPropKey.HELP:        'Do not calculate wobbled k-mers statistics - Include only k-mers with {A,C,G,T}',
         ArgPropKey.SHORT_FLAG:  '-nW',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_WOBBLE,
         ArgPropKey.ACTION:      'store_true',
@@ -207,18 +211,35 @@ ARGS_PROPERTIES = {
     UARGS.MAX_WOB_R_Y_OCC: {
         ArgPropKey.DEFAULT:     3,
         ArgPropKey.TYPE:        int,
-        ArgPropKey.HELP:        'Maximal occurence of wobble positions R (Purins) and Y (Pyrmidins) in the k-mers statistic calculation',
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions R (Purines) and Y (Pyrmidines) in the k-mers statistic calculation',
         ArgPropKey.SHORT_FLAG: '-wRY',
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_R_Y_OCC,
         ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
     },
-    UARGS.NO_LOG_FILE: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Without log file or stderr',
-        ArgPropKey.SHORT_FLAG:  '-nL',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.NO_LOG_FILE,
-        ArgPropKey.ACTION:      'store_true',
+    UARGS.MAX_WOB_M_S_W_OCC: {
+        ArgPropKey.DEFAULT:     3,
+        ArgPropKey.TYPE:        int,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions M, S, W (with both Purine and Pyrmidine) in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-wMSW',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_M_S_W_OCC,
+        ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
+    },
+    UARGS.MAX_WOB_B_D_H_V_OCC: {
+        ArgPropKey.DEFAULT:     2,
+        ArgPropKey.TYPE:        int,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions B,D,H,V (without A or C or G or T respectfully) in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-wBDHV',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_B_D_H_V_OCC,
+        ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
+    },
+    UARGS.VERBOSE: {
+        ArgPropKey.DEFAULT:     "info",
+        ArgPropKey.TYPE:        str,
+        ArgPropKey.CHOICES:     ["info", "silent", "debug"],
+        ArgPropKey.HELP:        'Verbosity level. In a non-silent mode (default), msgs are streamed to stderr (default) or logfile.',
+        ArgPropKey.METAVAR:     '<' + 'choices [info]' + '>',
+        ArgPropKey.SHORT_FLAG:  '-V',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.VERBOSE,   
     },
     UARGS.EXTRACT_READ_GROUP: {
         ArgPropKey.DEFAULT:     False,
@@ -246,7 +267,6 @@ def complements_uargs_help_string(args_properties):
     """    
     # looping over the args properties
     for key in args_properties:
-        # default_val = args_properties[key][ArgPropKey.DEFAULT]
         choices = args_properties[key].get(ArgPropKey.CHOICES)
         current_help = args_properties[key][ArgPropKey.HELP]
                        
@@ -260,7 +280,6 @@ def complements_uargs_help_string(args_properties):
         else:
             default_string = args_properties[key][ArgPropKey.DEFAULT]
             
-        # current_help += f"\n(default={args_properties[key][ArgPropKey.DEFAULT]})"
         if default_string != None:
             current_help += f"\n(default={default_string})"
         args_properties[key][ArgPropKey.HELP] = current_help
@@ -284,13 +303,13 @@ def complete_uargs_metavar_info(args_properties):
         f'<int max={args_properties[UARGS.MAX_SCORE][ArgPropKey.MAX]} [{args_properties[UARGS.MAX_SCORE][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.MIN_ERR_OBSRV][ArgPropKey.METAVAR] = \
-        f'<int between {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} to {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.METAVAR] =  \
-        f'<int between {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MIN]} to {args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.SCORE_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
 
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
-        f'<int between {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} and {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
+        f'<int {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} to {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
     
     return args_properties
 
@@ -374,18 +393,27 @@ def check_args(parser_args):
     """ Preform all the user args checks"""
     args_props= get_global_args_properties()
     parser_dict = vars(parser_args) # arguments to dictionary
-    # args_dict = vars(parser_args) 
     
-    if not parser_dict[UARGS.NO_LOG_FILE]: # dump arguments to logfile
-        log_f = parser_dict[UARGS.LOG_FILE]
-        [print(key,":",val, file=log_f) for key, val in parser_dict.items()]
-        print ("================================================", file=log_f)
-        log_f.flush()
+    # logger setting
+    if parser_dict[UARGS.VERBOSE] != "silent":
+        log_level = logging.INFO # default
+        
+        if parser_dict[UARGS.VERBOSE] == "debug":
+            log_level = logging.DEBUG
+            
+        initialize_logger(parser_dict[UARGS.LOG_FILE], log_level)
+        logger.debug("DEBUG MODE") # will log only in debug mode
+        
+        # construction and logging params info 
+        max_padding = max(len(key) for key in parser_dict)+1
+        params_list_str = [f"{key}{' ' * (max_padding - len(key))}:\t{val}" for key, val in parser_dict.items()]
+        concatenated_params = '\n'.join(params_list_str)
+        logger.info("\n" + concatenated_params+ 
+                     "\n========================================")
+        
     # preform checks 
     check_int_scope(args_props, parser_args)
     verify_outfile_csv(parser_args)
-    # if parser_args.concat_older: 
-    #     check_csv_file_exists(parser_args.concat_older)
     check_min_max_cycle(parser_args)
     return parser_dict
 
@@ -408,7 +436,6 @@ def load_parser():
     return parser
    
 if __name__ == "__main__": 
-    # cmd = "--infile temp.txt --concat_older bla.csv"
     cmd = "--infile temp.txt"
     # cmd = "--version"
 

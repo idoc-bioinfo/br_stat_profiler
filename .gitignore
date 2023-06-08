@@ -1,10 +1,12 @@
 backup/
+logs/
 data/
 .vscode/
 outfiles/
 notbooks/
 qerr_profiles/
 qerr_profiles_old/
+R_code_old/
 
 
 # Byte-compiled / optimized / DLL files
