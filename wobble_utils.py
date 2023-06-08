@@ -1,7 +1,7 @@
 import itertools, re, math
 import numpy as np
 import pandas as pd
-import swifter
+#import swifter
 
 from user_args import PRVT_ARG, UARGS
 from constants import RT2_STAT, RC_TAB2
@@ -125,12 +125,12 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
                                             .reset_index().rename(
                                                 columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
     # convert calculated pvalues to score
-    # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-    #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
-    #         .apply(lambda x: -10 * math.log10(x))  
     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-        wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
-            .apply(lambda x: -10 * math.log10(x))                                        
+        wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
+            .apply(lambda x: -10 * math.log10(x))  
+    # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+    #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
+    #         .apply(lambda x: -10 * math.log10(x))                                        
     
     wob_temp_score = pd.DataFrame()  
     # summerize the observations and errors
@@ -185,9 +185,9 @@ def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
             continue
         
         # extract the rows with k-mers that matches the wob_k_mer of interest
-        # wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
-        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].swifter.progress_bar(False)\
-            .apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
+        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
+        # wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].swifter.progress_bar(False)\
+        #     .apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
         
         if wob_df.empty:   # no rows with wob_k_mer matching
             continue
