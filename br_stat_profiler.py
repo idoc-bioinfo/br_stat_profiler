@@ -11,7 +11,7 @@ from constants import RT_HDR, ARG_TAB, RC_TAB1, RC_TAB2, CYC_RT2, RT2_STAT
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
 from wobble_utils import WobbleUtil, get_wobble_data
 from log_utils import logger
-LOG_HARVEST_ROW_COUNT = 5000
+LOG_HARVEST_ROW_COUNT = 50000
 
 
 def create_dtype_dict(formats_list):
@@ -52,8 +52,8 @@ def harvest_recal_tables(args_dict):
     
     with in_wrapper as iw_f:
         line = iw_f.readline()
+        
         while line:  # iterate until the end of the file
-               
             if not re.match(RT_HDR.TAB_PROP_PATTERN, line.rstrip()):
                 line = iw_f.readline() # read gap lines between tables  
                 continue
@@ -81,20 +81,22 @@ def harvest_recal_tables(args_dict):
             types_dict = create_dtype_dict(col_types)
             coltypes = [types_dict[t] for t in col_types]
             col_dict = dict(zip(cols, coltypes))
-            df = pd.DataFrame(columns=col_dict.keys()).astype(col_dict)
-            logger.info(f"Harvesting {table_name}, {row_count} rows")
+            # df = pd.DataFrame(columns=col_dict.keys()).astype(col_dict)
+            # logger.info(f"Harvesting {table_name}, {row_count} rows")
+            logger.info("Harvesting %s, %d rows", table_name,  row_count)
             row_num = 0
-            for i in range(0, row_count):
+            table_rows=[]
+            for _ in range(0, row_count):
                 line = iw_f.readline()
 
                 row_num += 1
                 if row_num % LOG_HARVEST_ROW_COUNT == 0:
-                    logger.info(f"\trow {row_num} ({row_num/row_count:.1%})")
-    
-                df.loc[i] = line.rstrip().split()
-            
-            df = df.astype(col_dict)
-
+                    # logger.info(f"\trow {row_num} ({row_num/row_count:.1%})")
+                    logger.info("\trow %d (%.1f%%)", row_num, row_num*100/row_count)
+                table_rows.append(line.rstrip().split())
+                # df.loc[i] = line.rstrip().split()
+            df = pd.DataFrame(table_rows, columns=col_dict.keys()).astype(col_dict)
+            # df = df.astype(col_dict)
             # add the harvested dataframe with its name as index
             harveseted_tables[table_name] = df
     
@@ -239,7 +241,8 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
 
     # Summerize the observations and errors
     grp_emp_score_df = item_rt2_df.groupby(
-        [RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])[[RC_TAB2.OBS_COL, RC_TAB2.ERR_OBSERV_COL]]\
+        [RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])\
+            [[RC_TAB2.OBS_COL, RC_TAB2.ERR_OBSERV_COL]]\
         .sum() \
         .rename(columns={RC_TAB2.OBS_COL: RT2_STAT.BIN_OBS_SUM_COL,
                          RC_TAB2.ERR_OBSERV_COL: RT2_STAT.BIN_ERR_OBSRV_SUM_COL}) \
@@ -262,8 +265,8 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
 
 
 def complete_missing_values(stat_df, full_cov_collection):
-    """Adds to a stat_df all the missing covariates from the FULL covariates colleciton with None values of the statisics
-
+    """Adds to a stat_df all the missing covariates from the FULL covariates 
+    colleciton with None values of the statisics
     Args:
         stat_df (pd.Dataframe): statistics table
         full_cov_collection (list): full covariates spaces
@@ -394,24 +397,15 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
                                                          args_dict[UARGS.MAX_WOB_M_S_W_OCC],
                                                          args_dict[UARGS.MAX_WOB_B_D_H_V_OCC])
 
-            # full_library = WobbleUtil.get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
-            #                                              args_dict[UARGS.MAX_WOB_N_OCC],
-            #                                              args_dict[UARGS.MAX_WOB_R_Y_OCC],
-            #                                              args_dict[UARGS.MAX_WOB_M_S_W_OCC],
-            #                                              args_dict[UARGS.MAX_WOB_B_D_H_V_OCC],
-            #                                              only_with_wob=False)
-
     # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
 
     # add wooble position statistics if needed
     # preform wobble
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
-        wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
-        # rt2_stat_df = get_wobble_data(rt2_stat_df, full_library, args_dict)
-        # rt2_stat_df = add_wobble_data(rt2_stat_df, full_library, args_dict)
+        only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
         rt2_stat_df = pd.concat([rt2_stat_df,
-                               get_wobble_data(rt2_stat_df, wobbled_k_mers, args_dict)
+                               get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
                                ])
         # return pd.concat([stat_df] + wob_df_list)   
     # remove statistics QErr values below cutoff (optional)
@@ -583,6 +577,7 @@ if __name__ == "__main__":
     # save_profile(profile, adict)
     with adict[UARGS.OUTFILE] as f:
         profile.to_csv(f)
+        logger.info("Profile saved - END")
 
     # ################### TESTING ############################
     # print(profile.head())

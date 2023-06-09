@@ -386,7 +386,7 @@ def verify_outfile_csv(args):
 def check_min_max_cycle(args):
     """ verify the min and max cycle do overlaps"""
     if args.max_cyc - args.min_cyc < args.cyc_bin_count:
-        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). \It cannont be divided into {args.cyc_bin_count} bins") 
+        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). It cannont be divided into {args.cyc_bin_count} bins") 
     return
 
 def check_args(parser_args):

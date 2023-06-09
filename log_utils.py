@@ -1,7 +1,6 @@
 import logging
 import time
 import sys
-from humanize import precisedelta
 
 # Create a custom log formatter
 class ElapsedTimeFormatter(logging.Formatter):
@@ -58,6 +57,12 @@ if __name__ == "__main__":
     # initialize_logger(file_descriptor)
     # file_handler = logging.StreamHandler(file_descriptor)
     # file_handler.setFormatter(file_formatter)
+
+    percentage = 78.456789
+
+    # Log the percentage with one decimal digit using lazy % formatting
+    logger.debug("The percentage is %.1f%%", percentage)
+    logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)", (5+1), (5+1)/9)
 
 # Log messages with previous time
     logger.debug('This is the first log message')
