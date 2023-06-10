@@ -113,6 +113,62 @@ class WobbleUtil:
 
 
 
+# def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNTXT_COV):
+#     """Calculates a single wobbled k_mer data out of the non wobbled positions
+
+#     Args:
+#         specific_wob_df (pd.Dataframe): df with statistics calculated for the non wobbled k-mers
+#         wobbled_k_mer (str):            wobbled_k_mer
+#         cov_type (str, optional):       the covariate type (currently only one option). 
+#         Defaults to RC_TAB2.CNTXT_COV.
+#     Returns:
+#         pd.Dataframe: table with the calculated statistics
+#     """  
+#     # calculate weighted average of pvalues    
+#     wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
+#         .apply(lambda x: np.average(
+#             x[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].astype(float),
+#             weights=x[RT2_STAT.BIN_OBS_SUM_COL].astype(int)))\
+#                                             .reset_index().rename(
+#                                                 columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
+#     # convert calculated pvalues to score
+#     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+#         wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
+#             .apply(lambda x: -10 * math.log10(x))  
+#     # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+#     #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
+#     #         .apply(lambda x: -10 * math.log10(x))                                        
+    
+#     wob_temp_score = pd.DataFrame()
+#     # summerize the observations and errors
+#     wob_temp_score = specific_wob_df.groupby(
+#         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
+#             [[RT2_STAT.BIN_OBS_SUM_COL, RT2_STAT.BIN_ERR_OBSRV_SUM_COL]]\
+#             .sum() \
+#             .rename(columns={RC_TAB2.OBS_COL:RT2_STAT.BIN_OBS_SUM_COL, 
+#                                 RC_TAB2.ERR_OBSERV_COL:RT2_STAT.BIN_ERR_OBSRV_SUM_COL})\
+#                                     .reset_index()
+    
+#     # calculate empirical collective error (phred formula)
+#     wob_temp_score[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+#         -10 * np.log10(wob_temp_score[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
+#             / wob_temp_score[RT2_STAT.BIN_OBS_SUM_COL])                                
+    
+#     # merge data into a new dataframe            
+#     wob_temp_df = pd.merge(wob_score_df, wob_temp_score,
+#                     on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])
+
+#     # Calculate QError
+#     wob_temp_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
+#         wob_temp_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_temp_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
+    
+#     # Add column with the wobbled k_mer value        
+#     wob_temp_df.insert(RT2_STAT.COV_TYPE_COL_IDX,cov_type, wobbled_k_mer)
+#     # logger.info("calculate_wobble_stat - End")
+#     return wob_temp_df
+
+
+
 def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNTXT_COV):
     """Calculates a single wobbled k_mer data out of the non wobbled positions
 
@@ -124,49 +180,31 @@ def calculate_wobble_stat(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNT
     Returns:
         pd.Dataframe: table with the calculated statistics
     """  
-    # calculate weighted average of pvalues    
+    # calculate weighted average of pvalues  + summerize the observations and errors
     wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
-        .apply(lambda x: np.average(
-            x[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].astype(float),
-            weights=x[RT2_STAT.BIN_OBS_SUM_COL].astype(int)))\
-                                            .reset_index().rename(
-                                                columns={0:RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
-    # convert calculated pvalues to score
-    wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-        wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
-            .apply(lambda x: -10 * math.log10(x))  
-    # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-    #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
-    #         .apply(lambda x: -10 * math.log10(x))                                        
+        .agg({RT2_STAT.BIN_AVG_QLTY_PVAL_COL: lambda x: np.average(x.astype(float), \
+            weights=specific_wob_df.loc[x.index, RT2_STAT.BIN_OBS_SUM_COL].astype(int)),
+              RT2_STAT.BIN_OBS_SUM_COL: 'sum',
+              RT2_STAT.BIN_ERR_OBSRV_SUM_COL:'sum'})\
+                  .reset_index()
     
-    wob_temp_score = pd.DataFrame()
-    # summerize the observations and errors
-    wob_temp_score = specific_wob_df.groupby(
-        [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
-            [[RT2_STAT.BIN_OBS_SUM_COL, RT2_STAT.BIN_ERR_OBSRV_SUM_COL]]\
-            .sum() \
-            .rename(columns={RC_TAB2.OBS_COL:RT2_STAT.BIN_OBS_SUM_COL, 
-                                RC_TAB2.ERR_OBSERV_COL:RT2_STAT.BIN_ERR_OBSRV_SUM_COL})\
-                                    .reset_index()
+    # convert calculated pvalues to score
+    wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] =  \
+        -10 * wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)  
     
     # calculate empirical collective error (phred formula)
-    wob_temp_score[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
-        -10 * np.log10(wob_temp_score[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-            / wob_temp_score[RT2_STAT.BIN_OBS_SUM_COL])                                
-    
-    # merge data into a new dataframe            
-    wob_temp_df = pd.merge(wob_score_df, wob_temp_score,
-                    on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])
+    wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+        -10 * np.log10(wob_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
+            / wob_score_df[RT2_STAT.BIN_OBS_SUM_COL])   
 
-    # Calculate QError
-    wob_temp_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
-        wob_temp_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_temp_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
-    
+    # Calculate QError (machine Quality score - Empirical score)
+    wob_score_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
+        wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
+
     # Add column with the wobbled k_mer value        
-    wob_temp_df.insert(RT2_STAT.COV_TYPE_COL_IDX,cov_type, wobbled_k_mer)
-    # logger.info("calculate_wobble_stat - End")
-    return wob_temp_df
-
+    wob_score_df.insert(RT2_STAT.COV_TYPE_COL_IDX, cov_type, wobbled_k_mer)
+    
+    return wob_score_df
 
 def get_wobble_data(stat_df, wobbled_k_mers_list):
     """Calculates statistics for all the wobbled k-mers and concatenate it alltogether
@@ -212,3 +250,22 @@ def get_wobble_data(stat_df, wobbled_k_mers_list):
                         (i+1), (i+1)*100/wobbled_k_mer_count)
     
     return pd.concat(wob_df_list)
+
+if __name__ == "__main__":
+    TEST_DIR = "./data/intermediates_files"
+    FILE_ONLY_WOB_K_MERS = "only_wobbled_k_mers.txt"
+    FILE_RT2_STAT_DF = "rt2_stat_df.csv"
+    import os
+    FULLPATH_W_K_MERS = os.path.join(TEST_DIR, FILE_ONLY_WOB_K_MERS)
+    FULLPATH_RT2_STAT_DF = os.path.join(TEST_DIR, FILE_RT2_STAT_DF)
+    
+    only_wobbled_k_mers = []
+    with open(FULLPATH_W_K_MERS, 'r') as file:
+        for line in file:
+            only_wobbled_k_mers.append(line.strip())
+    rt2_stat_df = pd.read_csv(FULLPATH_RT2_STAT_DF)
+    print(rt2_stat_df.shape)
+    print(rt2_stat_df.head())
+    print(only_wobbled_k_mers[1:5])
+
+    wob_df = get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
