@@ -7,11 +7,13 @@ class RT_HDR:
     COL_TYPES_IDX       = COLS_COUNT_IDX + 2
     TABLE_NAME_IDX      = 2
     TABLE_DESC_IDX      = 3
+# pylint: disable=no-member
 
 # Arguments table (first table in recal_table)
 class ARG_TAB:
     NAME            = "Arguments"
     MM_CNTXT_SIZE   = "mismatches_context_size"
+# pylint: disable=no-member
 
 # RecalTable1 colnames
 class RC_TAB1:
@@ -24,8 +26,7 @@ class RC_TAB1:
     RG_SCORE_BIN_COL    = "RG_ScoreBin"
     # categorial variables values
     MM_EVNT             = "M" # in EVNT_TYPE_COL
-
-    
+# pylint: disable=no-member
 
 # RecalTable2 colnames
 class RC_TAB2:
@@ -47,6 +48,7 @@ class RC_TAB2:
     MM_EVNT             = "M" # in EVNT_TYPE_COL
     CYC_COV             = "Cycle" # in COV_NAME_COL
     CNTXT_COV           = "Context" # in COV_NAME_COL
+# pylint: disable=no-member
 
 # Stat Auxiliary Table
 class RT2_STAT:
@@ -64,16 +66,20 @@ class RT2_STAT:
     ID_COL                      = "ID"
     ID_DELIM                    = ":"
     COV_TYPE_COL_IDX            = 2
-    
+# pylint: disable=no-member
+
 # Stat Auxiliary Table to calculate cycles statistics
 class CYC_RT2:
     CYC_COL             = RC_TAB2.CYC_COV
     CYC_BIN_COL         = "CycleBin"
+# pylint: disable=no-member
 
 class CNTXT_RT2:          
     CNTXT_COL           = RC_TAB2.CNTXT_COV
+# pylint: disable=no-member
 
 class RANGES:   # for plotting the stat table
     SCORE_BIN           = "RG_ScoreBin_Ranges"
     CYC_BIN             = "CycleBin_Ranges"
     # QLTY_ERR_RANGE_COL  = "QltyErrRange"
+# pylint: disable=no-member

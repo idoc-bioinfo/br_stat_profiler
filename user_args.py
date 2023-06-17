@@ -279,8 +279,8 @@ def complements_uargs_help_string(args_properties):
             default_string = "stdout"
         else:
             default_string = args_properties[key][ArgPropKey.DEFAULT]
-            
-        if default_string != None:
+        
+        if default_string is not None:
             current_help += f"\n(default={default_string})"
         args_properties[key][ArgPropKey.HELP] = current_help
     
@@ -379,7 +379,7 @@ def verify_outfile_csv(args):
     # add "csv' extension if needed
     _, ext = os.path.splitext(filename) # extract extension string
     if ext != ".csv":  # add csv extension and open file 
-        args.outfile = open(f"{filename}.csv", "x")
+        args.outfile = open(f"{filename}.csv", mode="x", encoding="utf-8")
         os.remove(filename)  # remove file without ext (opened by the parser automatically)
     return
 
@@ -408,8 +408,10 @@ def check_args(parser_args):
         max_padding = max(len(key) for key in parser_dict)+1
         params_list_str = [f"{key}{' ' * (max_padding - len(key))}:\t{val}" for key, val in parser_dict.items()]
         concatenated_params = '\n'.join(params_list_str)
-        logger.info("\n" + concatenated_params+ 
-                     "\n========================================")
+        logger.info("\n %s \n========================================", concatenated_params)
+        
+        # logger.info("\n" + concatenated_params+ 
+        #              "\n========================================")
         
     # preform checks 
     check_int_scope(args_props, parser_args)
@@ -440,10 +442,10 @@ if __name__ == "__main__":
     # cmd = "--version"
 
     
-    parser = load_parser()
-    args = parser.parse_args(cmd.split())
-    check_args(args)
-    args_dict = vars(args)
+    test_parser = load_parser()
+    t_args = test_parser.parse_args(cmd.split())
+    check_args(t_args)
+    args_dict = vars(t_args)
     # [print(key,":",val) for key,val in args_dict.items()] 
     # print(args_dict[UARGS.INFILE])
-    parser.print_help()
+    test_parser.print_help()
