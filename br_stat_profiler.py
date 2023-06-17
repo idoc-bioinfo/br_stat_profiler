@@ -396,10 +396,14 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
                                                          args_dict[UARGS.MAX_WOB_R_Y_OCC],
                                                          args_dict[UARGS.MAX_WOB_M_S_W_OCC],
                                                          args_dict[UARGS.MAX_WOB_B_D_H_V_OCC])
+            # with open("full_library_list", 'w') as file:
+            #     for item in full_library:
+            #         file.write(item + '\n')
 
     # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
-
+    # rt2_stat_df.to_csv('output.csv', index=False) # for testing
+    
     # add wooble position statistics if needed
     # preform wobble
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
@@ -420,7 +424,7 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
     rt2_stat_df = add_id_column(rt2_stat_df)
 
     # generate uniform order before profile extraction
-    rt2_stat_df = rt2_stat_df.sort_values( by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
+    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
     logger.info("prepare_stat_df finished")
     return rt2_stat_df
 
@@ -501,7 +505,8 @@ def extract_profile(stat_df, args_dict):
 
     target_colname = RT2_STAT.BIN_AVG_QLTY_ERR_COL
     q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
-                                                  target_colname, RT2_STAT.ID_COL, add_id_prefix=False)
+                                                  target_colname, RT2_STAT.ID_COL, 
+                                                  add_id_prefix=False)
     
     # zscoring if requested
     if args_dict[UARGS.ZSCORING]:
