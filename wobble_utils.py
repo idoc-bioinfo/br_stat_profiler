@@ -19,12 +19,12 @@ class WobbleUtil:
         'Y':    '[TC]',
         'W':    '[AT]',
         'S':    '[CG]',
-        'M':    '[AC]', 
+        'M':    '[AC]',
         'K':    '[GT]',
         'B':    '[CGT]',
         'D':    '[AGT]',
         'H':    '[ACT]',
-        'V':    '[ACG]',       
+        'V':    '[ACG]',
     }
     @staticmethod
     def match_k_mer(wobbled_k_mer, k_mer):
@@ -32,10 +32,10 @@ class WobbleUtil:
         Args:
             wobbled_k_mer (str): wobbled_k_mer
             k_mer (str): _description_
-            
+
         Returns:
             bool: matched / unmated
-        """    
+        """
         wob_regex = wobbled_k_mer
         # wobbled_k_mer => regex pattern
         for wob_base in WobbleUtil.patterns_dict:
@@ -43,7 +43,7 @@ class WobbleUtil:
 
         pattern = rf'^{wob_regex}$'
         return bool(re.match(pattern, k_mer))
-    
+
     @staticmethod
     def has_any(tested_str: str):
         """Check if k-mer has wobble positions """
@@ -51,35 +51,35 @@ class WobbleUtil:
             if wob in tested_str:
                 return True
         return False
-    
+
     @staticmethod
     def count_N_occ(tested_str: str):
         """Counts 'N' number """
         return tested_str.count('N')
-    
+
     @staticmethod
     def count_R_Y_occ(tested_str: str):
         """Counts 'R' and 'Y' number combined """
         return (tested_str.count('R') + tested_str.count('Y'))
-    
+
     @staticmethod
     def count_M_S_W_occ(tested_str: str):
         """Counts 'M' and 'S' and 'W' number combined """
         return (tested_str.count('M') + tested_str.count('S')+ tested_str.count('W'))
-    
+
     @staticmethod
     def count_B_D_H_V_occ(tested_str: str):
         """Counts 'B' and 'D' and 'V' number combined """
         return (tested_str.count('B') + tested_str.count('D') + \
             tested_str.count('H') + tested_str.count('V'))
-    
+
     @staticmethod
     def get_full_wobbled_k_mers_list(K,
                                      max_wob_N_occ,
                                      max_wob_R_Y_occ,
                                      max_wob_M_S_W_occ,
                                      max_wob_B_D_H_V_occ):
-               
+
         """
         get list of k-mers with the indicated wobbles position
         Args:
@@ -100,12 +100,12 @@ class WobbleUtil:
                 if (WobbleUtil.count_N_occ(s) <= max_wob_N_occ) and \
                     (WobbleUtil.count_R_Y_occ(s) <= max_wob_R_Y_occ) and \
                     (WobbleUtil.count_M_S_W_occ(s) <= max_wob_M_S_W_occ) and \
-                    (WobbleUtil.count_B_D_H_V_occ(s) <= max_wob_B_D_H_V_occ) 
+                    (WobbleUtil.count_B_D_H_V_occ(s) <= max_wob_B_D_H_V_occ)
             ]
         # logger.info(f"get_full_wobbled_k_mers_list: list ready (len={len(filtered_wob_strings)})")
         logger.info("get_full_wobbled_k_mers_list: list ready (len=%d)", len(filtered_wob_strings))
         return filtered_wob_strings
-    
+
     @staticmethod
     def remove_non_wobble(k_mer_list):
         logger.info("add_wobble_data: removing non-wobbled k_mers")
@@ -122,12 +122,12 @@ class WobbleUtil:
 #     Args:
 #         specific_wob_df (pd.Dataframe): df with statistics calculated for the non wobbled k-mers
 #         wobbled_k_mer (str):            wobbled_k_mer
-#         cov_type (str, optional):       the covariate type (currently only one option). 
+#         cov_type (str, optional):       the covariate type (currently only one option).
 #         Defaults to RC_TAB2.CNTXT_COV.
 #     Returns:
 #         pd.Dataframe: table with the calculated statistics
-#     """  
-#     # calculate weighted average of pvalues    
+#     """
+#     # calculate weighted average of pvalues
 #     wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
 #         .apply(lambda x: np.average(
 #             x[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].astype(float),
@@ -137,35 +137,35 @@ class WobbleUtil:
 #     # convert calculated pvalues to score
 #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
 #         wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL] \
-#             .apply(lambda x: -10 * math.log10(x))  
+#             .apply(lambda x: -10 * math.log10(x))
 #     # wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
 #     #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].swifter.progress_bar(False)\
-#     #         .apply(lambda x: -10 * math.log10(x))                                        
-    
+#     #         .apply(lambda x: -10 * math.log10(x))
+
 #     wob_temp_score = pd.DataFrame()
 #     # summerize the observations and errors
 #     wob_temp_score = specific_wob_df.groupby(
 #         [RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
 #             [[RT2_STAT.BIN_OBS_SUM_COL, RT2_STAT.BIN_ERR_OBSRV_SUM_COL]]\
 #             .sum() \
-#             .rename(columns={RC_TAB2.OBS_COL:RT2_STAT.BIN_OBS_SUM_COL, 
+#             .rename(columns={RC_TAB2.OBS_COL:RT2_STAT.BIN_OBS_SUM_COL,
 #                                 RC_TAB2.ERR_OBSERV_COL:RT2_STAT.BIN_ERR_OBSRV_SUM_COL})\
 #                                     .reset_index()
-    
+
 #     # calculate empirical collective error (phred formula)
 #     wob_temp_score[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
 #         -10 * np.log10(wob_temp_score[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-#             / wob_temp_score[RT2_STAT.BIN_OBS_SUM_COL])                                
-    
-#     # merge data into a new dataframe            
+#             / wob_temp_score[RT2_STAT.BIN_OBS_SUM_COL])
+
+#     # merge data into a new dataframe
 #     wob_temp_df = pd.merge(wob_score_df, wob_temp_score,
 #                     on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])
 
 #     # Calculate QError
 #     wob_temp_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
 #         wob_temp_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_temp_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
-    
-#     # Add column with the wobbled k_mer value        
+
+#     # Add column with the wobbled k_mer value
 #     wob_temp_df.insert(RT2_STAT.COV_TYPE_COL_IDX,cov_type, wobbled_k_mer)
 #     # logger.info("calculate_wobble_stat - End")
 #     return wob_temp_df
@@ -178,11 +178,11 @@ class WobbleUtil:
 #     Args:
 #         specific_wob_df (pd.Dataframe): df with statistics calculated for the non wobbled k-mers
 #         wobbled_k_mer (str):            wobbled_k_mer
-#         cov_type (str, optional):       the covariate type (currently only one option). 
+#         cov_type (str, optional):       the covariate type (currently only one option).
 #         Defaults to RC_TAB2.CNTXT_COV.
 #     Returns:
 #         pd.Dataframe: table with the calculated statistics
-#     """  
+#     """
 #     # calculate weighted average of pvalues  + summerize the observations and errors
 #     wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL,RC_TAB2.RG_SCORE_BIN_COL]) \
 #         .agg({RT2_STAT.BIN_AVG_QLTY_PVAL_COL: lambda x: np.average(x.astype(float), \
@@ -190,23 +190,23 @@ class WobbleUtil:
 #               RT2_STAT.BIN_OBS_SUM_COL: 'sum',
 #               RT2_STAT.BIN_ERR_OBSRV_SUM_COL:'sum'})\
 #                   .reset_index()
-    
+
 #     # convert calculated pvalues to score
 #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] =  \
-#         -10 * wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)  
-    
+#         -10 * wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)
+
 #     # calculate empirical collective error (phred formula)
 #     wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
 #         -10 * np.log10(wob_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-#             / wob_score_df[RT2_STAT.BIN_OBS_SUM_COL])   
+#             / wob_score_df[RT2_STAT.BIN_OBS_SUM_COL])
 
 #     # Calculate QError (machine Quality score - Empirical score)
 #     wob_score_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
 #         wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
 
-#     # Add column with the wobbled k_mer value        
+#     # Add column with the wobbled k_mer value
 #     wob_score_df.insert(RT2_STAT.COV_TYPE_COL_IDX, cov_type, wobbled_k_mer)
-    
+
 #     return wob_score_df
 
 
@@ -217,13 +217,13 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
     Args:
         specific_wob_df (pd.Dataframe): df with statistics calculated for the non wobbled k-mers
         wobbled_k_mer (str):            wobbled_k_mer
-        cov_type (str, optional):       the covariate type (currently only one option). 
+        cov_type (str, optional):       the covariate type (currently only one option).
         Defaults to RC_TAB2.CNTXT_COV.
     Returns:
         pd.Dataframe: table with the calculated statistics
-    """  
+    """
     # calculate weighted average of pvalues  + summerize the observations and errors
-    wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL, 
+    wob_score_df = specific_wob_df.groupby([RC_TAB2.RG_COL,
                                             RC_TAB2.RG_SCORE_BIN_COL])\
         .agg({
             cov_type                        : lambda x: wobbled_k_mer,
@@ -232,21 +232,21 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
               RT2_STAT.BIN_OBS_SUM_COL      : 'sum',
               RT2_STAT.BIN_ERR_OBSRV_SUM_COL: 'sum'
               }).reset_index()
-    
+
     # convert calculated pvalues to score
     wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] =  \
-        -10 * wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)  
-    
+        -10 * wob_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)
+
     # calculate empirical collective error (phred formula)
     wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
         -10 * np.log10(wob_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL] \
-            / wob_score_df[RT2_STAT.BIN_OBS_SUM_COL])   
+            / wob_score_df[RT2_STAT.BIN_OBS_SUM_COL])
 
     # Calculate QError (machine Quality score - Empirical score)
     wob_score_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
         wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
 
-    # Add column with the wobbled k_mer value        
+    # Add column with the wobbled k_mer value
     # wob_score_df.insert(RT2_STAT.COV_TYPE_COL_IDX, cov_type, wobbled_k_mer)
     return wob_score_df
 
@@ -260,39 +260,39 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
 
 #     Returns:
 #         pd.Dataframe: combined table with non_wobbled and wobbled data
-#     """        
+#     """
 #     logger.info("get_wobble_data: start")
 #     # wobbled_k_mers = WobbleUtil.remove_non_wobble(k_mers_list)
 #     wobbled_k_mer_count = len(wobbled_k_mers_list)
-    
-#     # looping over all the woobled k-mer 
+
+#     # looping over all the woobled k-mer
 #     wob_df_list = []
-    
+
 #     for i, wob_k_mer in enumerate(wobbled_k_mers_list):
 #         if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:
 #             # Should never happen in a real world scenario (only in testing)
 #             continue
-        
+
 #         # extract the rows with k-mers that matches the wob_k_mer of interest
 #         wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
 #             apply(lambda x, w_k_mer=wob_k_mer: WobbleUtil.match_k_mer(w_k_mer, x))]
 #         # wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].swifter.progress_bar(False)\
 #         #     .apply(lambda x: WobbleUtil.match_k_mer(wob_k_mer, x))]
-        
+
 #         if wob_df.empty: # no rows with wob_k_mer matching
 #             continue
-        
-#         #calculate the statistics of the wob_k_mer of interests 
+
+#         #calculate the statistics of the wob_k_mer of interests
 #         temp_wob_df = pd.DataFrame(
 #             calculate_wobble_stat_new(wob_df.copy(), wob_k_mer, cov_type = RC_TAB2.CNTXT_COV)
 #         )
 #         wob_df_list.append(temp_wob_df)
-        
+
 #         if (i+1) % REPORT_WOBBLES_PROGRESS == 0:
 #             # logger.info(f"get_wobble_data: wobbled_k_mer {i+1} ({(i+1)/wobbled_k_mer_count:.1%})")
-#             logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)", 
+#             logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)",
 #                         (i+1), (i+1)*100/wobbled_k_mer_count)
-    
+
 #     return pd.concat(wob_df_list)
 
 def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
@@ -305,15 +305,15 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
 
     Returns:
         pd.Dataframe: combined table with non_wobbled and wobbled data
-    """        
+    """
     logger.info("get_wobble_data: start")
     # wobbled_k_mers = WobbleUtil.remove_non_wobble(k_mers_list)
     wobbled_k_mer_count = len(wobbled_k_mers_list)
-    
-    # looping over all the woobled k-mer 
+
+    # looping over all the woobled k-mer
     current_chunk = []
     concatenated_chunks = []
-   
+
     for i, wob_k_mer in enumerate(wobbled_k_mers_list):
         if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:
             # Should never happen in a real world scenario (only in testing)
@@ -321,18 +321,18 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
         # extract the rows with k-mers that matches the wob_k_mer of interest
         wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
             apply(lambda x, w_k_mer=wob_k_mer: WobbleUtil.match_k_mer(w_k_mer, x))]
-        
+
         if wob_df.empty: # no rows with wob_k_mer matching
             continue
-        
-        #calculate the statistics of the wob_k_mer of interests 
+
+        #calculate the statistics of the wob_k_mer of interests
         temp_wob_df = calculate_wobble_stat_new(wob_df.copy(), wob_k_mer, cov_type = RC_TAB2.CNTXT_COV)
         current_chunk.append(temp_wob_df)
-        
+
         if (i+1) % REPORT_WOBBLES_PROGRESS == 0:
-            logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)", 
+            logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)",
                         (i+1), (i+1)*100/wobbled_k_mer_count)
-        
+
         if len(current_chunk) == CHUNK_SIZE:
             ddf_chunk = dd.from_pandas(pd.concat(current_chunk), npartitions=1)
             concatenated_chunks.append(ddf_chunk)
@@ -345,7 +345,7 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
         ddf_chunk = dd.from_pandas(pd.concat(current_chunk), npartitions=1)
         concatenated_chunks.append(ddf_chunk)
         logger.info("get_wobble_data: ddf_chunk %d concatenated (LAST)", len(concatenated_chunks))
-  
+
     return dd.concat(concatenated_chunks)
 
 if __name__ == "__main__":
@@ -355,7 +355,7 @@ if __name__ == "__main__":
     import os
     FULLPATH_W_K_MERS = os.path.join(TEST_DIR, FILE_ONLY_WOB_K_MERS)
     FULLPATH_RT2_STAT_DF = os.path.join(TEST_DIR, FILE_RT2_STAT_DF)
-    
+
     only_wobbled_k_mers = []
     with open(FULLPATH_W_K_MERS, 'r', encoding="utf-8") as file:
         for line in file:

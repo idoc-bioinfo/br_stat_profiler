@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 
 # usr-defined dependencies
-from constants import RT_HDR, ARG_TAB, RC_TAB1, RC_TAB2, CYC_RT2, RT2_STAT
+from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT
 # pylint: disable=no-member
 
 # from usr_props import UserProperties
@@ -25,7 +25,7 @@ def create_dtype_dict(formats_list):
     Args:
         formats_list (list): list of typing formats (%s, %d, etc)
     Returns:
-        dictionary: {typing format: dtype} 
+        dictionary: {typing format: dtype}
     """
     dtype_dict = {}
     for substring in formats_list:
@@ -48,20 +48,20 @@ def harvest_recal_tables(args_dict):
         args_dict(dict): args dictionary (for in_wrapper and log_wrapper)
 
     Returns:
-        pd.Series: array with the harvested dataframes of the GATK Report. 
+        pd.Series: array with the harvested dataframes of the GATK Report.
         The index name is the Table name as appears in the GATK Report
     """
     in_wrapper = args_dict[UARGS.INFILE]
 
     # the result list to collect the harvested tables
     harveseted_tables = pd.Series(dtype='object')
-    
+
     with in_wrapper as iw_f:
         line = iw_f.readline()
-        
+
         while line:  # iterate until the end of the file
             if not re.match(RT_HDR.TAB_PROP_PATTERN, line.rstrip()):
-                line = iw_f.readline() # read gap lines between tables  
+                line = iw_f.readline() # read gap lines between tables
                 continue
 
             # properties header detected
@@ -71,7 +71,6 @@ def harvest_recal_tables(args_dict):
             if not re.match(RT_HDR.TAB_NAME_PATTERN, line.rstrip()):  # table hdr unmatched
                 continue
             # name header detected, the table meets the pattern read line above
-        
             # extract properties and table name
             cols_count = int(prop_hdr_tokens[RT_HDR.COLS_COUNT_IDX])
             row_count = int(prop_hdr_tokens[RT_HDR.ROWS_COUNT_IDX])
@@ -87,8 +86,6 @@ def harvest_recal_tables(args_dict):
             types_dict = create_dtype_dict(col_types)
             coltypes = [types_dict[t] for t in col_types]
             col_dict = dict(zip(cols, coltypes))
-            # df = pd.DataFrame(columns=col_dict.keys()).astype(col_dict)
-            # logger.info(f"Harvesting {table_name}, {row_count} rows")
             logger.info("Harvesting %s, %d rows", table_name,  row_count)
             row_num = 0
             table_rows=[]
@@ -100,19 +97,16 @@ def harvest_recal_tables(args_dict):
                     # logger.info(f"\trow {row_num} ({row_num/row_count:.1%})")
                     logger.info("\trow %d (%.1f%%)", row_num, row_num*100/row_count)
                 table_rows.append(line.rstrip().split())
-                # df.loc[i] = line.rstrip().split()
-            df = pd.DataFrame(table_rows, columns=col_dict.keys()).astype(col_dict)
-            # df = df.astype(col_dict)
-            # add the harvested dataframe with its name as index
-            harveseted_tables[table_name] = df
-    
+
+            harveseted_tables[table_name] = pd.DataFrame(table_rows, columns=col_dict.keys()).astype(col_dict)
+
     logger.info("\\--------------- Harvest Finished ----------------/")
     return harveseted_tables
 
-def divide_into_ranges_by_master_list(lst, master_list, K):
+def bin_using_a_master_list(lst, master_list, K):
     """Binning a numeric list into EQUAL ranges
-        1) Deducting the bins ranges by a master list and K bins. (max-min//K)
-        2) Dividing th evalues in the list to the bins
+        1) Deducing the bins ranges from a master list and K bins. (max-min//K)
+        2) Dividing the values in the list to the bins
 
     Args:
         lst (list): The list for binning
@@ -130,8 +124,8 @@ def divide_into_ranges_by_master_list(lst, master_list, K):
     groups = [x-1 for x in groups]
     return groups
 
-def divide_into_ranges(lst, K):
-    """Binning a list to equeal ranges  
+def bin_a_list(lst, K):
+    """Binning a list to equal ranges
 
     Args:
         lst (list): list for binning
@@ -140,183 +134,79 @@ def divide_into_ranges(lst, K):
     Returns:
         list: bin# of each item in lst (starts with 0)
     """
-    return divide_into_ranges_by_master_list(lst, lst, K)
+    return bin_using_a_master_list(lst, lst, K)
 
-
-def preprocess_rt1_df(GATK_Tables, args_dict):
-    """Binning the score based on ReacalTable1
-
-    Args:
-        GATK_Tables (pd.Series): Array with all the GATKReport Tables
-        args_dict (dictionary): user arguments (for user-defined bin count)
-
-    Returns:
-        pd.Dataframe: The table with additional ScoreBin column
-    """
-    # get a copy of RecalTable1
-    rt1_df = GATK_Tables[RC_TAB1.NAME].copy()
-    # filter the scores above MIN_SCORE
-    rt1_df = rt1_df[
-        (rt1_df[RC_TAB1.EVNT_TYPE_COL] == RC_TAB1.MM_EVNT) &
-        (rt1_df[RC_TAB1.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE]) &
-        (rt1_df[RC_TAB1.QLTY_SCORE_COL] <= args_dict[UARGS.MAX_SCORE])
-    ]
-    # # Add columns bin the scores in each ReadGrpou and add a column with the score bins
-    rt1_df[RC_TAB1.RG_SCORE_BIN_COL] = divide_into_ranges(rt1_df[RC_TAB1.QLTY_SCORE_COL],
-                                                          K=args_dict[UARGS.SCORE_BINS_COUNT])
-
-    return rt1_df
-
-# 1) filter rt2_df for mismatch events and additional user-defined filters (see comments)
-# 2) add to rt2_df new RG_SCORE_BIN_COL based on rt1_df
-
-
-def preprocess_rc_tab2_df(GATK_Tables, rt1_df, args_dict):
+def filter_and_binning_rc_tab2_df(rt2_df, args_dict):
     """PreProces the RecallTable2 data as follows:
-    - filter by mismatch event, min and max QScore and  min error obsv, 
-    - add Score bin column
+    - filter by mismatch event, min and max QScore and  min error obsv,
+    - add bin the Score value into a new column
     Args:
         GATK_Tables (pd.Series): Array with all the GATKReport Tables
-        rt1_df (pd.Dataframe): preprocessed RecalTable1
         args_dict (dictionary): user arguments (for user-defined bin count)
 
     Returns:
         pd.Dataframe: RecalTable2 with addtional columns described above
     """
-    # get a copy of RecallTable2
-    rt2_df = GATK_Tables[RC_TAB2.NAME].copy()
+
     # FILTER rows by: (1) MISMATCH event, (2) min score and (3) min error observations
-    rt2_df = rt2_df[
+    sliced_rt2_df = rt2_df.loc[
         (rt2_df[RC_TAB2.EVNT_TYPE_COL] == RC_TAB2.MM_EVNT) &
         (rt2_df[RC_TAB2.QLTY_SCORE_COL] >= args_dict[UARGS.MIN_SCORE]) &
         (rt2_df[RC_TAB2.QLTY_SCORE_COL] <= args_dict[UARGS.MAX_SCORE]) &
-        (rt2_df[RC_TAB2.ERR_OBSERV_COL] >= args_dict[UARGS.MIN_ERR_OBSRV])
-    ]
-    # add score bins values from rc_tab1_df
-    rt2_df = pd.merge(rt2_df, rt1_df[[RC_TAB1.QLTY_SCORE_COL, RC_TAB1.RG_SCORE_BIN_COL]],
-                      on=RC_TAB1.QLTY_SCORE_COL, how='left')
-    return rt2_df
+        (rt2_df[RC_TAB2.ERR_OBSERV_COL] >= args_dict[UARGS.MIN_ERR_OBSRV])].copy()
 
-
-def filter_cov_type(rt2_df, cov_type):
-    """Filter table by a covariate type(either context or cycle data), renaming the CovariateValue column accordingly.   
-
-    Args:
-        rt2_df (pd.Dataframe): preprocesed RecalTable2
-        cov_type (str): the covariate type name
-
-    Returns:
-        pd.Dataframe: a filtered table with cov_type column
-    """
-    # filter by CYCLE covariates into new dataframe
-    cyc_rt2_df = rt2_df[rt2_df[RC_TAB2.COV_NAME_COL] == cov_type]
-    # Rename the covariate value column as "Cycle" {COV_NAME_COL  =>  CYCLE_IDX}
-    return cyc_rt2_df.rename(columns={RC_TAB2.COV_VAL_COL: cov_type})
-
+    # Add columns bin the scores in each ReadGrpou and add a column with the score bins
+    sliced_rt2_df[RC_TAB2.RG_SCORE_BIN_COL] = bin_a_list(sliced_rt2_df[RC_TAB2.QLTY_SCORE_COL],
+                                                          K=args_dict[UARGS.SCORE_BINS_COUNT])
+    return sliced_rt2_df
 
 def calculate_stat_rt2_df(item_rt2_df, cov_type):
     """Calculate statistics per covariate & ReadGroup & ScoreBin:
-        - QError weighted mean within ReadGroup and ScoreBin
+        - calculate QScore weighted mean per ScoreBin and covariate
+        - calculate Empirical QScore per ScoreBin and covariate
+        - QError weighted mean within ReadGroup and ScoreBin and covariate
 
     Args:
         item_rt2_df (pd.Dataframe): Processed RecalTable2
         cov_type (str): the covariate type name
 
     Returns:
-        pd.Dataframe: Table with arithmethic and weighted mean statistics 
+        pd.Dataframe: Table with arithmethic and weighted mean statistics
     """
+    # convert Phred values to pvals (for averaging)
+    item_rt2_df[RC_TAB2.QLTY_PVAL_COL] = 10 ** (-item_rt2_df[RC_TAB2.QLTY_SCORE_COL]/10)
 
-    # Phred values => pvals (for averaging)
-    item_rt2_df[RC_TAB2.QLTY_PVAL_COL] = 10 ** (
-        -item_rt2_df[RC_TAB2.QLTY_SCORE_COL]/10)
-
-    # calculate collective Quality Score (weighted average)
-    grp_score_df = item_rt2_df.groupby(
+    # calculate collective Quality Score (weighted average) by scorebin and covariate
+    # summerize the observations and errors columns by score bin and covariate
+    stat_df = item_rt2_df.groupby(
         [RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])\
-        .apply(lambda x: np.average(x[RC_TAB2.QLTY_PVAL_COL].astype(float),
-                                    weights=x[RC_TAB2.OBS_COL].astype(int))) \
-        .reset_index(). \
-        rename(columns={0: RT2_STAT.BIN_AVG_QLTY_PVAL_COL})
+            .agg(**{
+                RT2_STAT.BIN_AVG_QLTY_PVAL_COL :
+                    (RC_TAB2.QLTY_PVAL_COL, lambda x: np.average(x.astype(float),
+                            weights=item_rt2_df.loc[x.index,RC_TAB2.OBS_COL].astype(int))),
+                 RT2_STAT.BIN_OBS_SUM_COL      : (RC_TAB2.OBS_COL, 'sum'),
+                 RT2_STAT.BIN_ERR_OBSRV_SUM_COL: (RC_TAB2.ERR_OBSERV_COL, 'sum')
+                 }
+              ).reset_index()
 
     # Back from pvals => Phred value
-    grp_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
-        grp_score_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(
-            lambda x: -10 * math.log10(x))
-
-    # Summerize the observations and errors
-    grp_emp_score_df = item_rt2_df.groupby(
-        [RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])\
-            [[RC_TAB2.OBS_COL, RC_TAB2.ERR_OBSERV_COL]]\
-        .sum() \
-        .rename(columns={RC_TAB2.OBS_COL: RT2_STAT.BIN_OBS_SUM_COL,
-                         RC_TAB2.ERR_OBSERV_COL: RT2_STAT.BIN_ERR_OBSRV_SUM_COL}) \
-        .reset_index()
+    stat_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL] = \
+       -10 * stat_df[RT2_STAT.BIN_AVG_QLTY_PVAL_COL].apply(math.log10)
 
     # Calculate Empirical collective error (Phred formula)
-    grp_emp_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
-        -10 * np.log10(grp_emp_score_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL]
-                       / grp_emp_score_df[RT2_STAT.BIN_OBS_SUM_COL])
-
-    # merge data into a new stat dataframe
-    stat_df = pd.merge(grp_score_df, grp_emp_score_df,
-                       on=[RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL, cov_type])
+    stat_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] =  \
+        -10 * np.log10(stat_df[RT2_STAT.BIN_ERR_OBSRV_SUM_COL]
+                       / stat_df[RT2_STAT.BIN_OBS_SUM_COL])
 
     # Calculate QError
     stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
         stat_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - stat_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
-
     return stat_df
-
-
-# def complete_missing_values(stat_df, full_cov_collection):
-#     """Adds to a stat_df all the missing covariates from the FULL covariates 
-#     colleciton with None values of the statisics
-#     Args:
-#         stat_df (pd.Dataframe): statistics table
-#         full_cov_collection (list): full covariates spaces
-
-#     Returns:
-#         pd.Dataframe: stat_df with additional rows for the missing covariates (None value) 
-#     """
-#     cov_type = stat_df.columns[RT2_STAT.COV_TYPE_COL_IDX]
-
-#     # Generate df with the complement set of the existing covariate set
-#     missing_df = stat_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[cov_type] \
-#         .apply(lambda x: list(set(full_cov_collection) - set(x))) \
-#         .reset_index() \
-#         .explode(cov_type)\
-#         .dropna(subset=[cov_type]) \
-#         .reset_index(drop=True)
-
-#     # Substitute "None" in the statistics cols (located right to the cov_type column)
-#     right_cols = stat_df.columns[stat_df.columns.get_loc(cov_type)+1:]
-#     missing_df.loc[:, right_cols] = None
-#     # add the missing_df to the stat_df
-#     return pd.concat([stat_df, missing_df], ignore_index=True)
-
-
-# def add_id_column(stat_df):
-#     """Addition of column with unique ID per ReadGroup
-#     The IDs will be used for an index in the final profile.
-
-#     ID sturcture: < specific_covariate : ScoreBin : covrariate_type>
-#     Args:
-#         stat_df (pd.Dataframe): statistics table
-
-#     Returns:
-#         pd.Dataframe: statistics table with addtional columns with IDS 
-#     """
-#     cov_type = stat_df.columns[RT2_STAT.COV_TYPE_COL_IDX]  # covariate type
-#     suffix = cov_type
-#     # adding coloumn_id by joining together data from two different columns + suffix
-#     stat_df[RT2_STAT.ID_COL] = stat_df[[cov_type, RC_TAB2.RG_SCORE_BIN_COL]].astype(str) \
-#         .apply(lambda x:  RT2_STAT.ID_DELIM.join(list(x) + [suffix]), axis=1)
-#     return stat_df
 
 # calculates and add a new column with CYCLES_QUNATILES
 def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
     """Binning the cycles into a new column.
-        In practice, each bin represent a specific segment (range) of on the reads 
+        In practice, each bin represent a specific segment (range) of on the reads
 
     Args:
         cyc_rt2_df (pd.Dataframe): stat_df with Cycle as covariate
@@ -326,8 +216,6 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
     Returns:
         pd.Dataframe: statistic table with cycle binning
     """
-    # avoid warning of chained assignment
-    pd.options.mode.chained_assignment = None  # default='warn'
 
     # convert cycles value to integer
     cyc_rt2_df[CYC_RT2.CYC_COL] = cyc_rt2_df[CYC_RT2.CYC_COL].astype(int)
@@ -336,77 +224,44 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
     cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = cyc_rt2_df[CYC_RT2.CYC_COL].abs()
 
     # bins the abs values of the cycles into a new column - CYCLE_BIN_COL
-    cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = divide_into_ranges_by_master_list(
+    cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = bin_using_a_master_list(
         cyc_rt2_df[CYC_RT2.CYC_COL].abs(),
         cyc_range_abs,
         K=args_dict[UARGS.CYC_BINS_COUNT]
     )
 
-    # add 1 to the values in CYCLE_BIN_COL (to exclude 0 for symetrity reasons)
-    cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = cyc_rt2_df[CYC_RT2.CYC_BIN_COL].apply(
-        lambda x: x + 1)
-
+    # # add 1 to the values in CYCLE_BIN_COL (to exclude 0 for symetrity reasons)
     # set the original sign of COV_VAL_COL to the newly generated CYCLE_BIN_COL column
-    cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = cyc_rt2_df.apply(lambda row: row[CYC_RT2.CYC_BIN_COL] *
+    cyc_rt2_df[CYC_RT2.CYC_BIN_COL] = cyc_rt2_df.apply(lambda row: (row[CYC_RT2.CYC_BIN_COL] +1)*
                                                        np.sign(row[CYC_RT2.CYC_COL]), axis=1)
+
     return cyc_rt2_df
 
-
-# def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
-
-#     # target_colname = cov_type
-#     # if cov_type == RC_TAB2.CYC_COV:
-#     #     target_colname = CYC_RT2.CYC_BIN_COL
-#     #  # calculate statistics without wooble
-#     # rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
-#     # rt2_stat_df.to_csv('output.csv', index=False) # for testing
-    
-#     # add wooble position statistics if needed
-#     # preform wobble
-#     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
-#         only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
-#         rt2_stat_df = pd.concat([rt2_stat_df,
-#                                get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
-#                                ])
-#         # return pd.concat([stat_df] + wob_df_list)   
-#     # remove statistics QErr values below cutoff (optional)
-#     if args_dict[UARGS.QERR_SYM_CUTOFF]:
-#         rt2_stat_df = rt2_stat_df[ abs(rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >=  args_dict[UARGS.QERR_CUTOFF] ]
-#     else: 
-#         rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]
-#                                   >= args_dict[UARGS.QERR_CUTOFF]]
-
-#     # complete the missing set of data (as None)
-#     rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
-#     rt2_stat_df = add_id_column(rt2_stat_df)
-#     return rt2_stat_df
-    
-
 def ddf_get_missing_values(stat_ddf, full_cov_collection):
-    """Adds to a stat_df all the missing covariates from the FULL covariates 
+    """Adds to a stat_df all the missing covariates from the FULL covariates
     colleciton with None values of the statisics
     Args:
         stat_df (dd.Dataframe): statistics table
         full_cov_collection (list): full covariates spaces
 
     Returns:
-        pd.Dataframe: stat_df with additional rows for the missing covariates (None value) 
+        pd.Dataframe: stat_df with additional rows for the missing covariates (None value)
     """
     cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]
-    logger.debug("dd_missing_values: cov_type=%s", cov_type)
+    logger.info("completing missing kmers/cyc: cov_type=%s", cov_type)
     def subtract_set(x):
         return list(set(full_cov_collection) - set(x))
 
     # Generate ddf with the complement set of the existing covariate set
     missing_ddf = stat_ddf.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[cov_type] \
-        .apply(delayed(subtract_set), meta=('result', 'object'))\
-            .reset_index().compute().rename(columns={'result': cov_type})\
-                .explode(cov_type)\
-                    .dropna(subset=[cov_type])
-    
+        .apply(delayed(subtract_set), meta=(cov_type, 'object'))\
+            .reset_index().compute().explode(cov_type)\
+                .dropna(subset=[cov_type])
+
     # Substitute "None" in the statistics cols (located right to the cov_type column)
     right_cols = stat_ddf.columns[stat_ddf.columns.get_loc(cov_type)+1:]
     missing_ddf.loc[:, right_cols] = None
+    logger.info("missing k_mers/cyc completed!!")
     return missing_ddf
 
 def ddf_add_id_column(stat_ddf):
@@ -418,16 +273,18 @@ def ddf_add_id_column(stat_ddf):
         stat_df (pd.Dataframe): statistics table
 
     Returns:
-        pd.Dataframe: statistics table with addtional columns with IDS 
+        pd.Dataframe: statistics table with addtional columns with IDS
     """
+    logger.info("adding id column")
     cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]  # covariate type
     suffix = cov_type
     def generate_id(row, suffix):
         return RT2_STAT.ID_DELIM.join(list(row) + [suffix])
 
-    # adding coloumn_id by joining together data from two different columns + suffix  
+    # adding coloumn_id by joining together data from two different columns + suffix
     stat_ddf[RT2_STAT.ID_COL] = stat_ddf[[cov_type, RC_TAB2.RG_SCORE_BIN_COL]].astype(str)\
         .apply(generate_id, args=(suffix,), axis=1, meta=(RT2_STAT.ID_COL, 'object'))
+    logger.info("id column added!!")
     return stat_ddf
 
 def ddf_prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
@@ -444,21 +301,28 @@ def ddf_prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
     # print("#1\n",rt2_stat_ddf.head())
     if args_dict[UARGS.QERR_SYM_CUTOFF]:
         rt2_stat_ddf = rt2_stat_ddf[abs(rt2_stat_ddf[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >= args_dict[UARGS.QERR_CUTOFF]]
-    else: 
+    else:
         rt2_stat_ddf = rt2_stat_ddf[rt2_stat_ddf[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
 
     missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library)
     if len(missing_ddf.index) != 0:
-        rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf])    
+        rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf])
     rt2_stat_ddf = ddf_add_id_column(rt2_stat_ddf)
 
+
     # extract 3 columns and conerting into panads DataFrame
+    # if args_dict[UARGS.SAVE_INTERMEDIATE]: # for debugging
+    #     rt2_ext_ddf = rt2_stat_ddf[[RC_TAB2.RG_COL,RT2_STAT.ID_COL, RT2_STAT.BIN_AVG_QLTY_ERR_COL]].compute()
+    #     # saving file for the case of later memory crash
+    #     timestamp = time.strftime('%Y-%m-%d_%H-%M-%S')
+    #     output_csv_file = f'output_data_{timestamp}.csv'
+    #     rt2_stat_ddf.to_csv(output_csv_file)
+
+    # rt2_ext_df = pd.DataFrame(output_csv_file)
+    # return rt2_ext_df
+
     rt2_ext_ddf = rt2_stat_ddf[[RC_TAB2.RG_COL,RT2_STAT.ID_COL, RT2_STAT.BIN_AVG_QLTY_ERR_COL]].compute()
-    rt2_ext_df = pd.DataFrame(rt2_ext_ddf)
-    return rt2_ext_df
-    
-    # rt2_ext_ddf = rt2_stat_ddf[[RC_TAB2.RG_COL,RT2_STAT.ID_COL, RT2_STAT.BIN_AVG_QLTY_ERR_COL]].compute()
-    # return pd.DataFrame(rt2_ext_ddf)
+    return pd.DataFrame(rt2_ext_ddf)
 
 def prepare_stat_df(rt2_df, cov_type, args_dict):
     """Preparation a statistics table before profile extraction
@@ -474,8 +338,11 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
 
     full_library = []
     target_colname = cov_type
-    mode_rt2_df = filter_cov_type(rt2_df, cov_type)
-    
+
+    # filter the requested covariate type, change column name
+    mode_rt2_df = rt2_df[rt2_df[RC_TAB2.COV_NAME_COL] == cov_type]\
+        .rename(columns={RC_TAB2.COV_VAL_COL: cov_type})
+
     # Extract the readgroup string from format C5BCAACXX:1:none
     if args_dict[UARGS.EXTRACT_READ_GROUP]:
         mode_rt2_df[RC_TAB2.RG_COL] = mode_rt2_df[RC_TAB2.RG_COL].apply(
@@ -514,35 +381,16 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
 
     # # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
-    # # rt2_stat_df.to_csv('output.csv', index=False) # for testing
-    
-    # # add wooble position statistics if needed
-    # # preform wobble
-    # if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
-    #     only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
-    #     rt2_stat_df = pd.concat([rt2_stat_df,
-    #                            get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
-    #                            ])
-    #     # return pd.concat([stat_df] + wob_df_list)   
-    # # remove statistics QErr values below cutoff (optional)
-    # if args_dict[UARGS.QERR_SYM_CUTOFF]:
-    #     rt2_stat_df = rt2_stat_df[ abs(rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >=  args_dict[UARGS.QERR_CUTOFF] ]
-    # else: 
-    #     rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]
-    #                               >= args_dict[UARGS.QERR_CUTOFF]]
 
-    # # complete the missing set of data (as None)
-    # rt2_stat_df = complete_missing_values(rt2_stat_df, full_library)
-    # rt2_stat_df = add_id_column(rt2_stat_df)
     # rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
     rt2_stat_df = ddf_prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
     # generate uniform order before profile extraction
-    rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
+    # rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
     logger.info("prepare_stat_df finished")
     return rt2_stat_df
 
 def preprocess_GATK_report(args_dict):
-    """preprocess GATKReport:  
+    """preprocess GATKReport:
         - harvest the data into dataframes
         - bin the scores
         - adds ScoreBin column to the RecalTable2
@@ -560,53 +408,14 @@ def preprocess_GATK_report(args_dict):
     args_dict[PRVT_ARG.MM_CNTXT_SIZE] = int(
         args_df[args_df["Argument"] == ARG_TAB.MM_CNTXT_SIZE]["Value"])
 
-    # recal table 1 and 2 pre-proocessing
-    rt1_df = preprocess_rt1_df(GATKTables, args_dict)  # Bin the scores
-    return preprocess_rc_tab2_df(GATKTables, rt1_df, args_dict)  # add ScoreBin to RecalTable2
-
-
-def extract_profiles_from_stat_df(stat_df):
-    #RC_TAB2.RG_COL, RT2_STAT.ID_COL
-    """Extracts the covariates value into a profile table. 
-    Set the ID column to be the profile index, add the covariate type as prefix to the index
-
-    Args:
-        stat_df (pd.Dataframe): complete statistics table calculated from the GATK report
-        read_group (str): read_group ID
-        stat_type (str): the stat type (either QErrorAvg or Frequency)
-        idx_col (str):  the index colname
-        add_id_prefix (bool, optional): Defaults to True.
-
-    Returns:
-        pd.Dataframe: a profile table with the covariates values before zscoring
-    """
-    # for each read_group, extract the covariates value into a vector
-    cov_vec_list = [pd.Series(stat_df[stat_df[RC_TAB2.RG_COL] == key] \
-        [RT2_STAT.BIN_AVG_QLTY_ERR_COL].values, name=key)
-                    for key in set(stat_df[RC_TAB2.RG_COL])]
-
-    # filter stat_df by the first key in the key set and extract the index of the items
-    row_index = stat_df[stat_df[RC_TAB2.RG_COL] == list(
-        set(stat_df[RC_TAB2.RG_COL]))[0]][RT2_STAT.ID_COL].values
-    
-    # generate the profiles table from the covariates vectors => i.e a dataframe with the covariates values
-    # transform and add the index
-    profiles_df = pd.DataFrame(cov_vec_list).T.set_index(row_index)
-
-    # # add to the profile index stat_type as prefix to index
-    # if add_id_prefix:
-    #     prefix = stat_type + RT2_STAT.ID_DELIM
-    #     new_index = {idx: prefix + idx for idx in profiles_df.index}
-    #     profiles_df = profiles_df.rename(index=new_index)
-
-    # sort profiles by index for uniformity
-    return profiles_df.sort_index()
-
+    rt2_df = GATKTables[RC_TAB2.NAME]
+    # recal table 2 pre-proocessing
+    return filter_and_binning_rc_tab2_df(rt2_df, args_dict)  # add ScoreBin to RecalTable2
 
 def extract_profile(stat_df, args_dict):
     """Extracts profiles form the stat table.
     Optionally the profile is ZSCORED (by --zscore flag)
-    
+
     Args:
         stat_df (pd.Dataframe): statistics table ready for profile extaction
         args_dict (dict): user arguments
@@ -614,15 +423,14 @@ def extract_profile(stat_df, args_dict):
     Returns:
         pd.Dataframe: zscored profile
     """
-    
-    q_err_profile = pd.DataFrame()
-    # target_colname = ""
-    # target_colname = RT2_STAT.BIN_AVG_QLTY_ERR_COL
-    # q_err_profile = extract_profiles_from_stat_df(stat_df, RC_TAB2.RG_COL,
-    #                                               target_colname, RT2_STAT.ID_COL, 
-    #                                               add_id_prefix=False)
-    
-    q_err_profile = extract_profiles_from_stat_df(stat_df)
+
+    # stat_df = stat_df.categorize(columns=[RC_TAB2.RG_COL,RT2_STAT.ID_COL])
+    q_err_profile = stat_df.pivot_table(columns=RC_TAB2.RG_COL,
+                                                values=RT2_STAT.BIN_AVG_QLTY_ERR_COL,
+                                                index = RT2_STAT.ID_COL)
+    q_err_profile = q_err_profile.sort_values(RT2_STAT.ID_COL)
+
+
     # zscoring if requested
     if args_dict[UARGS.ZSCORING]:
         scaler = StandardScaler()
@@ -630,7 +438,7 @@ def extract_profile(stat_df, args_dict):
                                      columns=q_err_profile.columns, index=q_err_profile.index)
 
     # Substitute a filler char to instead of 'None' if requested
-    if args_dict[UARGS.NAN_REP] != None:  # nan_rep == 0 by default
+    if args_dict[UARGS.NAN_REP] is not None:  # nan_rep == 0 by default
         q_err_profile = q_err_profile.fillna(args_dict[UARGS.NAN_REP])
 
     return q_err_profile
@@ -639,7 +447,7 @@ def extract_profile(stat_df, args_dict):
 def _profile_rt(pre_stat_df, args_dict):
     """
     Extracts profiles form the stat table.
-    The exracted profiles are optionally zscored 
+    The exracted profiles are optionally zscored
 
     The covariate type is indicated in the user arguments dictionary (default="cntxt")
     from the following choices ["cntxt", "cyc", "cntxt_cyc"]
@@ -650,7 +458,7 @@ def _profile_rt(pre_stat_df, args_dict):
         args_dict (dict): user arguments
 
     Returns:
-        pd.Dataframe: final profile 
+        pd.Dataframe: final profile
     """
     if args_dict[UARGS.COV_TYPE] == "cntxt" or args_dict[UARGS.COV_TYPE] == "cntxt_cyc":
         cntxt_rt2_stat_df = prepare_stat_df(
@@ -671,6 +479,9 @@ def _profile_rt(pre_stat_df, args_dict):
     return pd.concat([cntxt_profile, cyc_profile])
 
 def profile_rt(pre_stat_df, args_dict):
+    """
+    added for logging purposes
+    """
     ready_profile = _profile_rt(pre_stat_df, args_dict)
     logger.info("br_stat_profiler finished!!!")
     return ready_profile
@@ -681,11 +492,12 @@ if __name__ == "__main__":
     # testing  code
     # ################### TESTING ############################
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
-    # REC_TAB_FULL_PATH = \
-    #     RECAL_TABLE_DIR + "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -ct cyc -lg log.txt"
+    # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.4"
+    # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt -nW -ct cyc" # -o test.csv"
     # args = parser.parse_args(cmd.split())
-    ################### PRODUCTTION ############################
+    ################## PRODUCTTION ############################
     args = parser.parse_args()
     # ============================================================
 
@@ -693,8 +505,7 @@ if __name__ == "__main__":
     # [print(key,":",val) for key,val in adict.items()]
     rt2_pre_stat_df = preprocess_GATK_report(adict)
     profile = profile_rt(rt2_pre_stat_df, adict)
-    
-    # save_profile(profile, adict)
+
     with adict[UARGS.OUTFILE] as f:
         profile.to_csv(f)
         logger.info("Profile saved - END")

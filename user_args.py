@@ -21,7 +21,7 @@ class ArgPropKey(StrEnum):
     NARGS       =   'nargs'
     ACTION      =   'action'
     VERSION     =   'version'
-   
+
 # draft_prop = {
 #     ArgPropKey.DEFAULT: 10,
 #     ArgPropKey.TYPE: int,
@@ -36,7 +36,8 @@ class ArgPropKey(StrEnum):
 #     ArgPropKey.ACTION:  None, # store_true
 # }
 
-VERSION_NUMBER='1.1'
+# VERSION_NUMBER='1.1'
+VERSION_NUMBER='1.2'
 
 class UARGS:
     """ User Arguments"""
@@ -47,11 +48,11 @@ class UARGS:
     MAX_SCORE           =   "max_score"
     MIN_ERR_OBSRV       =   "min_err_observed"
     CYC_BINS_COUNT      =   "cyc_bin_count"
-    MAX_CYC             =   "max_cyc"  
+    MAX_CYC             =   "max_cyc"
     MIN_CYC             =   "min_cyc"
-    NAN_REP             =   "nan_rep" 
+    NAN_REP             =   "nan_rep"
     ZSCORING            =   "zscore"        # True
-    COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }  
+    COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }
     QERR_CUTOFF         =   "qerr_cutoff"
     QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
     NO_WOBBLE           =   "no_wobble"
@@ -62,8 +63,9 @@ class UARGS:
     VERBOSE             =   "verbose"
     LOG_FILE            =   "log_file"
     EXTRACT_READ_GROUP  =   "extract_read_group"
-    
-     
+    SAVE_INTERMEDIATE   =   "save_intermediate"
+
+
 class PRVT_ARG:      # private arguments
     """Private arguments"""
     MM_CNTXT_SIZE       =   "mm_cntxt_size"   # argument if filled duting  analysis
@@ -77,21 +79,21 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-i',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.INFILE,
     },
-    UARGS.OUTFILE: {   # outfile 
+    UARGS.OUTFILE: {   # outfile
         ArgPropKey.DEFAULT:     sys.stdout,
         ArgPropKey.TYPE:        argparse.FileType('x'),
         ArgPropKey.HELP:        'Path of NON-EXISTING .csv file for the generated profile.',
         ArgPropKey.METAVAR:     '<*.csv [stdout]>',
         ArgPropKey.SHORT_FLAG:  '-o',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.OUTFILE,   
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.OUTFILE,
     },
-    UARGS.LOG_FILE: {   # outfile 
+    UARGS.LOG_FILE: {   # outfile
         ArgPropKey.DEFAULT:     sys.stderr,
         ArgPropKey.TYPE:        argparse.FileType('x'),
         ArgPropKey.HELP:        'NON-EXISTING file for profile metadata .',
         ArgPropKey.METAVAR:     '<*.* [stderr]>',
         ArgPropKey.SHORT_FLAG:  '-lg',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.LOG_FILE,   
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.LOG_FILE,
     },
     UARGS.MIN_SCORE: {
         ArgPropKey.DEFAULT: 1,
@@ -175,14 +177,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.ZSCORING,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.COV_TYPE: { 
+    UARGS.COV_TYPE: {
         ArgPropKey.DEFAULT:     "cntxt",
         ArgPropKey.TYPE:        str,
         ArgPropKey.CHOICES:     ["cntxt", "cyc", "cntxt_cyc"],
         ArgPropKey.HELP:        'Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or both (context + cycle).',
         ArgPropKey.METAVAR:     '<' + 'choices [cntxt]' + '>',
         ArgPropKey.SHORT_FLAG:  '-ct',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,   
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.COV_TYPE,
     },
     UARGS.QERR_CUTOFF: {
         ArgPropKey.DEFAULT: -20,
@@ -239,7 +241,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.HELP:        'Verbosity level. In a non-silent mode (default), msgs are streamed to stderr (default) or logfile.',
         ArgPropKey.METAVAR:     '<' + 'choices [info]' + '>',
         ArgPropKey.SHORT_FLAG:  '-V',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.VERBOSE,   
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.VERBOSE,
     },
     UARGS.EXTRACT_READ_GROUP: {
         ArgPropKey.DEFAULT:     False,
@@ -249,6 +251,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
         ArgPropKey.ACTION:      'store_true',
     },
+    UARGS.SAVE_INTERMEDIATE: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Save Intermediate for the case of later memory crash',
+        ArgPropKey.SHORT_FLAG:  '-sI',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.SAVE_INTERMEDIATE,
+        ArgPropKey.ACTION:      'store_true',
+    },
 }
 
 
@@ -256,7 +266,7 @@ ARGS_PROPERTIES = {
 BQ_STAT_PROFILER_DESC = f"br_stat_profiler (v{VERSION_NUMBER}) - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be compared/clustered downstream. " + \
     "It generates a separate profile for each ReadGroup in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output for further processing."
 
-def complements_uargs_help_string(args_properties):  
+def complements_uargs_help_string(args_properties):
     """ add to the help string suffix with default values and choices if exists
 
     Args:
@@ -264,29 +274,29 @@ def complements_uargs_help_string(args_properties):
 
     Returns:
         dict: user arguments with added help strings
-    """    
+    """
     # looping over the args properties
     for key in args_properties:
         choices = args_properties[key].get(ArgPropKey.CHOICES)
         current_help = args_properties[key][ArgPropKey.HELP]
-                       
+
         if choices:
             current_help += f' options={str(choices)},'
-        
+
         if key == UARGS.INFILE:
             default_string = "stdin"
         elif key == UARGS.OUTFILE:
             default_string = "stdout"
         else:
             default_string = args_properties[key][ArgPropKey.DEFAULT]
-        
+
         if default_string is not None:
             current_help += f"\n(default={default_string})"
         args_properties[key][ArgPropKey.HELP] = current_help
-    
+
     return args_properties
-        
-        
+
+
 def complete_uargs_metavar_info(args_properties):
     """add metavar info according to the MIN, Max and DEFAULT parameters
 
@@ -295,10 +305,10 @@ def complete_uargs_metavar_info(args_properties):
 
     Returns:
         dict: user arguments with added metavar string
-    """        
+    """
     args_properties[UARGS.MIN_SCORE][ArgPropKey.METAVAR] = \
         f'<int min={args_properties[UARGS.MIN_SCORE][ArgPropKey.MIN]} [{args_properties[UARGS.MIN_SCORE][ArgPropKey.DEFAULT]}]>'
-    
+
     args_properties[UARGS.MAX_SCORE][ArgPropKey.METAVAR] = \
         f'<int max={args_properties[UARGS.MAX_SCORE][ArgPropKey.MAX]} [{args_properties[UARGS.MAX_SCORE][ArgPropKey.DEFAULT]}]>'
 
@@ -310,7 +320,7 @@ def complete_uargs_metavar_info(args_properties):
 
     args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.METAVAR] =  \
         f'<int {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MIN]} to {args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.MAX]} [{args_properties[UARGS.CYC_BINS_COUNT][ArgPropKey.DEFAULT]}]>'
-    
+
     return args_properties
 
 # preparation of argument default
@@ -322,53 +332,53 @@ def get_global_args_properties():
 
 def parser_add_arg(parser, props):
     """ loading a user properties with default values"""
-    parser.add_argument(props.get(ArgPropKey.SHORT_FLAG), 
+    parser.add_argument(props.get(ArgPropKey.SHORT_FLAG),
         props[ArgPropKey.LONG_FLAG],
         default =   props.get(ArgPropKey.DEFAULT),
         type    =   props[ArgPropKey.TYPE],
-        help    =   props[ArgPropKey.HELP], 
+        help    =   props[ArgPropKey.HELP],
         metavar =   props[ArgPropKey.METAVAR],
-        choices =   props.get(ArgPropKey.CHOICES), 
+        choices =   props.get(ArgPropKey.CHOICES),
         action  =   props.get(ArgPropKey.ACTION),
         nargs   =   props.get(ArgPropKey.NARGS)
     )
 
 def parser_add_bool_arg(parser,props):
     """"loading a boolean argument (without metavar and type properties)"""
-    parser.add_argument(props.get(ArgPropKey.SHORT_FLAG), 
+    parser.add_argument(props.get(ArgPropKey.SHORT_FLAG),
         props[ArgPropKey.LONG_FLAG],
         default =   props.get(ArgPropKey.DEFAULT),
-        help    =   props[ArgPropKey.HELP], 
+        help    =   props[ArgPropKey.HELP],
         action  =   props.get(ArgPropKey.ACTION),
     )
 
 def check_int_scope(arg_props, parser_args):
-    """verify that the int values satisfyies the predefined scope limits 
+    """verify that the int values satisfyies the predefined scope limits
 
     Args:
-        arg_props (dict): initial arguments (include scope data) 
+        arg_props (dict): initial arguments (include scope data)
         parser args (dict): arguments loaded to the parser
 
     Raises:
         argparse.ArgumentTypeError: out of scope
-        argparse.ArgumentTypeError: below min 
+        argparse.ArgumentTypeError: below min
         argparse.ArgumentTypeError: above max
-    """ 
+    """
     for key, prop in arg_props.items():
         if ArgPropKey.MIN in prop and ArgPropKey.MAX in prop:
             arg_value = getattr(parser_args, key)
             if arg_value < prop[ArgPropKey.MIN] or arg_value > prop[ArgPropKey.MAX]:
                 raise argparse.ArgumentTypeError(f"{key} must be between {prop[ArgPropKey.MIN]} and {prop[ArgPropKey.MAX]}")
-        
+
         if ArgPropKey.MIN in prop:  # only min value was given
             arg_value = getattr(parser_args, key)
             if arg_value < prop[ArgPropKey.MIN]:
                 raise argparse.ArgumentTypeError(f"{key} must be above {prop[ArgPropKey.MIN]}")
-        
+
         if ArgPropKey.MAX in prop:  # only max value was given
             arg_value = getattr(parser_args, key)
             if arg_value > prop[ArgPropKey.MAX]:
-                raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")        
+                raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")
     return
 
 def verify_outfile_csv(args):
@@ -378,7 +388,7 @@ def verify_outfile_csv(args):
         return
     # add "csv' extension if needed
     _, ext = os.path.splitext(filename) # extract extension string
-    if ext != ".csv":  # add csv extension and open file 
+    if ext != ".csv":  # add csv extension and open file
         args.outfile = open(f"{filename}.csv", mode="x", encoding="utf-8")
         os.remove(filename)  # remove file without ext (opened by the parser automatically)
     return
@@ -386,34 +396,34 @@ def verify_outfile_csv(args):
 def check_min_max_cycle(args):
     """ verify the min and max cycle do overlaps"""
     if args.max_cyc - args.min_cyc < args.cyc_bin_count:
-        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). It cannont be divided into {args.cyc_bin_count} bins") 
+        raise argparse.ArgumentError(None, f"Cycles profiling scope is too small ({args.min_cyc}-{args.max_cyc}). It cannont be divided into {args.cyc_bin_count} bins")
     return
 
 def check_args(parser_args):
     """ Preform all the user args checks"""
     args_props= get_global_args_properties()
     parser_dict = vars(parser_args) # arguments to dictionary
-    
+
     # logger setting
     if parser_dict[UARGS.VERBOSE] != "silent":
         log_level = logging.INFO # default
-        
+
         if parser_dict[UARGS.VERBOSE] == "debug":
             log_level = logging.DEBUG
-            
+
         initialize_logger(parser_dict[UARGS.LOG_FILE], log_level)
         logger.debug("DEBUG MODE") # will log only in debug mode
-        
-        # construction and logging params info 
+
+        # construction and logging params info
         max_padding = max(len(key) for key in parser_dict)+1
         params_list_str = [f"{key}{' ' * (max_padding - len(key))}:\t{val}" for key, val in parser_dict.items()]
         concatenated_params = '\n'.join(params_list_str)
         logger.info("\n %s \n========================================", concatenated_params)
-        
-        # logger.info("\n" + concatenated_params+ 
+
+        # logger.info("\n" + concatenated_params+
         #              "\n========================================")
-        
-    # preform checks 
+
+    # preform checks
     check_int_scope(args_props, parser_args)
     verify_outfile_csv(parser_args)
     check_min_max_cycle(parser_args)
@@ -424,7 +434,7 @@ def load_parser():
     """ loading user argument into parser (before parsing)"""
     args_props= get_global_args_properties()
     # add description
-    parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)   
+    parser = argparse.ArgumentParser(description=BQ_STAT_PROFILER_DESC)
     # add version
     parser.add_argument('--version', action='version', version=f'Version: {VERSION_NUMBER}')
     parser.set_defaults(version=VERSION_NUMBER)  # for the logging
@@ -432,20 +442,20 @@ def load_parser():
     for _, props in args_props.items():
         store_true = props.get(ArgPropKey.ACTION) == 'store_true'
         if store_true:
-            parser_add_bool_arg(parser, props)    
+            parser_add_bool_arg(parser, props)
         else:
             parser_add_arg(parser, props)
     return parser
-   
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     cmd = "--infile temp.txt"
     # cmd = "--version"
 
-    
+
     test_parser = load_parser()
     t_args = test_parser.parse_args(cmd.split())
     check_args(t_args)
     args_dict = vars(t_args)
-    # [print(key,":",val) for key,val in args_dict.items()] 
+    # [print(key,":",val) for key,val in args_dict.items()]
     # print(args_dict[UARGS.INFILE])
     test_parser.print_help()

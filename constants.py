@@ -15,19 +15,6 @@ class ARG_TAB:
     MM_CNTXT_SIZE   = "mismatches_context_size"
 # pylint: disable=no-member
 
-# RecalTable1 colnames
-class RC_TAB1:
-    # GATK original colnames
-    QLTY_SCORE_COL      = "QualityScore"
-    EVNT_TYPE_COL       = "EventType"
-    # OBSRV_COL           = "Observations"
-    # added for preprocessing
-    NAME                = "RecalTable1" 
-    RG_SCORE_BIN_COL    = "RG_ScoreBin"
-    # categorial variables values
-    MM_EVNT             = "M" # in EVNT_TYPE_COL
-# pylint: disable=no-member
-
 # RecalTable2 colnames
 class RC_TAB2:
     # GATK original colnames
@@ -38,7 +25,7 @@ class RC_TAB2:
     EVNT_TYPE_COL       = "EventType"
     EMP_QLTY_COL        = "EmpiricalQuality"
     OBS_COL             = "Observations"
-    ERR_OBSERV_COL      = "Errors" 
+    ERR_OBSERV_COL      = "Errors"
     # added for preprocessing
     NAME                = "RecalTable2"
     RG_SCORE_BIN_COL    = "RG_ScoreBin"
@@ -57,12 +44,12 @@ class RT2_STAT:
 
     BIN_OBS_SUM_COL             = "BinSumObs"
     BIN_ERR_OBSRV_SUM_COL      = "BinSumObsErrs"
-    
+
     BIN_AVG_EMP_QLTY_COL        = "BinAvgEmpQlty"
     BIN_AVG_QLTY_PVAL_COL       = "BinAvgQltyPval"
     BIN_AVG_QLTY_SCORE_COL      = "BinAvgQltyScore"
     BIN_AVG_QLTY_ERR_COL        = "BinAvgQltyErr"
-    
+
     ID_COL                      = "ID"
     ID_DELIM                    = ":"
     COV_TYPE_COL_IDX            = 2
@@ -74,7 +61,7 @@ class CYC_RT2:
     CYC_BIN_COL         = "CycleBin"
 # pylint: disable=no-member
 
-class CNTXT_RT2:          
+class CNTXT_RT2:
     CNTXT_COL           = RC_TAB2.CNTXT_COV
 # pylint: disable=no-member
 
