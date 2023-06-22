@@ -2,6 +2,7 @@ import logging
 import sys
 import argparse
 import os
+import io
 from enum import Enum
 from log_utils import initialize_logger, logger
 
@@ -45,25 +46,26 @@ class UARGS:
     OUTFILE             =   "outfile"
     SCORE_BINS_COUNT    =   "scr_bin_count"
     MIN_SCORE           =   "min_score"
-    MAX_SCORE           =   "max_score"
-    MIN_ERR_OBSRV       =   "min_err_observed"
-    CYC_BINS_COUNT      =   "cyc_bin_count"
-    MAX_CYC             =   "max_cyc"
-    MIN_CYC             =   "min_cyc"
-    NAN_REP             =   "nan_rep"
-    ZSCORING            =   "zscore"        # True
-    COV_TYPE            =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }
-    QERR_CUTOFF         =   "qerr_cutoff"
-    QERR_SYM_CUTOFF     =   "qerr_cutoff_both_sides"
-    NO_WOBBLE           =   "no_wobble"
-    MAX_WOB_N_OCC       =   "max_wob_N_occ"
-    MAX_WOB_R_Y_OCC     =   "max_wob_R_Y_occ"
-    MAX_WOB_M_S_W_OCC   =   "max_wob_M_S_W_occ"
-    MAX_WOB_B_D_H_V_OCC =   "max_wob_B_D_H_V_occ"
-    VERBOSE             =   "verbose"
-    LOG_FILE            =   "log_file"
-    EXTRACT_READ_GROUP  =   "extract_read_group"
-    SAVE_INTERMEDIATE   =   "save_intermediate"
+    MAX_SCORE                   =   "max_score"
+    MIN_ERR_OBSRV               =   "min_err_observed"
+    CYC_BINS_COUNT              =   "cyc_bin_count"
+    MAX_CYC                     =   "max_cyc"
+    MIN_CYC                     =   "min_cyc"
+    NAN_REP                     =   "nan_rep"
+    ZSCORING                    =   "zscore"        # True
+    COV_TYPE                    =   "cov_type"      #"cntxt"      # {"cntxt", "cyc", "cntxt_cyc" }
+    QERR_CUTOFF                 =   "qerr_cutoff"
+    QERR_SYM_CUTOFF             =   "qerr_cutoff_both_sides"
+    NO_WOBBLE                   =   "no_wobble"
+    MAX_WOB_N_OCC               =   "max_wob_N_occ"
+    MAX_WOB_R_Y_OCC             =   "max_wob_R_Y_occ"
+    MAX_WOB_M_S_W_OCC           =   "max_wob_M_S_W_occ"
+    MAX_WOB_B_D_H_V_OCC         =   "max_wob_B_D_H_V_occ"
+    VERBOSE                     =   "verbose"
+    LOG_FILE                    =   "log_file"
+    EXTRACT_READ_GROUP          =   "extract_read_group"
+    DEBUG_SAVE_INTERMEDIATE     =   "save_intermediate"
+    MULTIPLE_CSV_OUTPUT         =   "multiple_csv_output"
 
 
 class PRVT_ARG:      # private arguments
@@ -79,9 +81,17 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-i',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.INFILE,
     },
+    # UARGS.OUTFILE: {   # outfile
+    #     ArgPropKey.DEFAULT:     sys.stdout,
+    #     ArgPropKey.TYPE:        argparse.FileType('x'),
+    #     ArgPropKey.HELP:        'Path of NON-EXISTING .csv file for the generated profile.',
+    #     ArgPropKey.METAVAR:     '<*.csv [stdout]>',
+    #     ArgPropKey.SHORT_FLAG:  '-o',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.OUTFILE,
+    # },
     UARGS.OUTFILE: {   # outfile
         ArgPropKey.DEFAULT:     sys.stdout,
-        ArgPropKey.TYPE:        argparse.FileType('x'),
+        ArgPropKey.TYPE:        str,
         ArgPropKey.HELP:        'Path of NON-EXISTING .csv file for the generated profile.',
         ArgPropKey.METAVAR:     '<*.csv [stdout]>',
         ArgPropKey.SHORT_FLAG:  '-o',
@@ -96,7 +106,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.LOG_FILE,
     },
     UARGS.MIN_SCORE: {
-        ArgPropKey.DEFAULT: 1,
+        ArgPropKey.DEFAULT: 20,
         ArgPropKey.TYPE: int,
         ArgPropKey.MIN: 1,
         ArgPropKey.HELP: 'Minimal QualityScore value for profiling',
@@ -120,7 +130,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:'--' + UARGS.MIN_ERR_OBSRV,
     },
     UARGS.SCORE_BINS_COUNT: {
-        ArgPropKey.DEFAULT: 4,
+        ArgPropKey.DEFAULT: 3,
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
         ArgPropKey.MAX:     10,
@@ -251,12 +261,20 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.SAVE_INTERMEDIATE: {
+    UARGS.MULTIPLE_CSV_OUTPUT: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Save ouptut table in multiple csv files',
+        ArgPropKey.SHORT_FLAG:  '-mCSV',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.MULTIPLE_CSV_OUTPUT,
+        ArgPropKey.ACTION:      'store_true',
+    },
+    UARGS.DEBUG_SAVE_INTERMEDIATE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,
         ArgPropKey.HELP:        'Save Intermediate for the case of later memory crash',
         ArgPropKey.SHORT_FLAG:  '-sI',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.SAVE_INTERMEDIATE,
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.DEBUG_SAVE_INTERMEDIATE,
         ArgPropKey.ACTION:      'store_true',
     },
 }
@@ -381,17 +399,28 @@ def check_int_scope(arg_props, parser_args):
                 raise argparse.ArgumentTypeError(f"{key} must be below {prop[ArgPropKey.MAX]}")
     return
 
-def verify_outfile_csv(args):
-    """add to outfile csv extension if needed"""
-    filename = args.outfile.name
-    if filename  == 'stdout' or filename == '<stdout>':
+# def verify_outfile_csv(args):
+#     """add to outfile csv extension if needed"""
+#     filename = args.outfile.name
+#     if filename  == 'stdout' or filename == '<stdout>':
+#         return
+#     # add "csv' extension if needed
+#     _, ext = os.path.splitext(filename) # extract extension string
+#     if ext != ".csv":  # add csv extension and open file
+#         args.outfile = open(f"{filename}.csv", mode="x", encoding="utf-8")
+#         os.remove(filename)  # remove file without ext (opened by the parser automatically)
+#     return
+
+def verify_outfile_not_exists(args):
+    if isinstance(args.outfile, io.TextIOWrapper):
         return
+    filename = args.outfile
+    if os.path.exists(filename):
+        raise argparse.ArgumentTypeError(f"outfile {filename} already exists!!!")
     # add "csv' extension if needed
     _, ext = os.path.splitext(filename) # extract extension string
     if ext != ".csv":  # add csv extension and open file
-        args.outfile = open(f"{filename}.csv", mode="x", encoding="utf-8")
-        os.remove(filename)  # remove file without ext (opened by the parser automatically)
-    return
+        args.outfile += ext
 
 def check_min_max_cycle(args):
     """ verify the min and max cycle do overlaps"""
@@ -423,9 +452,12 @@ def check_args(parser_args):
         # logger.info("\n" + concatenated_params+
         #              "\n========================================")
 
+
+
     # preform checks
     check_int_scope(args_props, parser_args)
-    verify_outfile_csv(parser_args)
+    # verify_outfile_csv(parser_args)
+    verify_outfile_not_exists(parser_args)
     check_min_max_cycle(parser_args)
     return parser_dict
 
@@ -448,14 +480,16 @@ def load_parser():
     return parser
 
 if __name__ == "__main__":
-    cmd = "--infile temp.txt"
+    cmd = "--infile temp.txt " #--outfile temp1.txt"
     # cmd = "--version"
 
 
     test_parser = load_parser()
     t_args = test_parser.parse_args(cmd.split())
+    print(t_args.outfile)
+    print(type(t_args.outfile))
     check_args(t_args)
     args_dict = vars(t_args)
     # [print(key,":",val) for key,val in args_dict.items()]
     # print(args_dict[UARGS.INFILE])
-    test_parser.print_help()
+    # test_parser.print_help()
