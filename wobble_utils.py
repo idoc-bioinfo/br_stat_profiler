@@ -10,7 +10,7 @@ from constants import RT2_STAT, RC_TAB2
 from log_utils import logger
 
 REPORT_WOBBLES_PROGRESS = 2500
-CHUNK_SIZE = 10000  # number of woble df data
+CHUNK_SIZE = 10000 * 4  # number of woble df data
 
 class WobbleUtil:
     patterns_dict = {
