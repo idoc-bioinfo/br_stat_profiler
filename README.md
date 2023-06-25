@@ -1,4 +1,4 @@
-# br_stat_profiler (v1.1)
+# br_stat_profiler (v1.2)
 
 Profiler of GATK BaseRecalibrator Report
 
