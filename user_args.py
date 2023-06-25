@@ -492,4 +492,4 @@ if __name__ == "__main__":
     args_dict = vars(t_args)
     # [print(key,":",val) for key,val in args_dict.items()]
     # print(args_dict[UARGS.INFILE])
-    # test_parser.print_help()
+    test_parser.print_help()
