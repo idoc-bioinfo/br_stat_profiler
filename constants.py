@@ -1,3 +1,5 @@
+import numpy as np
+import dask.dataframe as dd
 
 class RT_HDR:
     TAB_PROP_PATTERN    = r'^#:GATKTable:.*;' # Pattern for table properties
@@ -70,3 +72,16 @@ class RANGES:   # for plotting the stat table
     CYC_BIN             = "CycleBin_Ranges"
     # QLTY_ERR_RANGE_COL  = "QltyErrRange"
 # pylint: disable=no-member
+
+stat_ddf_schema = {
+    RC_TAB2.RG_COL                  :   str,
+    RC_TAB2.RG_SCORE_BIN_COL        :   'Int8',
+    RC_TAB2.CNTXT_COV               :   str,
+    RT2_STAT.BIN_AVG_QLTY_PVAL_COL  :   'Float64',
+    RT2_STAT.BIN_OBS_SUM_COL        :   'Int64',
+    RT2_STAT.BIN_ERR_OBSRV_SUM_COL  :   'Int64',
+    RT2_STAT.BIN_AVG_QLTY_SCORE_COL :   'Float64',
+    RT2_STAT.BIN_AVG_EMP_QLTY_COL   :   'Float64',
+    RT2_STAT.BIN_AVG_QLTY_ERR_COL   :   'Float64',
+    # RT2_STAT.ID_COL                 : str,
+}

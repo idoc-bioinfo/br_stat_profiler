@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import dask.dataframe as dd
 
-from constants import RT2_STAT, RC_TAB2
+from constants import RT2_STAT, RC_TAB2, stat_ddf_schema
 # pylint: disable=no-member
 from log_utils import logger
 
@@ -346,7 +346,7 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
         concatenated_chunks.append(ddf_chunk)
         logger.info("get_wobble_data: ddf_chunk %d concatenated (LAST)", len(concatenated_chunks))
 
-    return dd.concat(concatenated_chunks)
+    return dd.concat(concatenated_chunks).astype(stat_ddf_schema)
 
 if __name__ == "__main__":
     TEST_DIR = "./data/intermediates_files"
@@ -364,5 +364,3 @@ if __name__ == "__main__":
     print(rt2_stat_df.shape)
     print(rt2_stat_df.head())
     print(only_wobbled_k_mers[1:5])
-
-    # wob_df1 = get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
