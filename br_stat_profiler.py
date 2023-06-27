@@ -258,7 +258,7 @@ def ddf_get_missing_values(stat_ddf, full_cov_collection):
     # Generate ddf with the complement set of the existing covariate set
     missing_ddf = stat_ddf.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[cov_type] \
         .apply(delayed(subtract_set), meta=(cov_type, 'object'))\
-            .reset_index().compute().explode(cov_type)\
+            .reset_index().persist().compute().explode(cov_type)\
                 .dropna(subset=[cov_type])
 
     # Substitute "None" in the statistics cols (located right to the cov_type column)
@@ -500,7 +500,7 @@ def ddf_profile_rt(pre_stat_df, args_dict):
     added for logging purposes
     """
     ready_profile_ddf = _ddf_profile_rt(pre_stat_df, args_dict)
-    logger.info("br_stat_profiler finished!!!")
+    logger.info("ddf_profile_rt processing finished!!!")
     return ready_profile_ddf
 
 
@@ -508,30 +508,31 @@ if __name__ == "__main__":
     parser = load_parser()
     # testing  code
     # ################### TESTING ############################
-    # RECAL_TABLE_DIR = "./data/test_bqsr/"
-    # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.4"
-    # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
+    RECAL_TABLE_DIR = "./data/test_bqsr/"
+    RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.4"
+    REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
     # # # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt " # -nW -ct cyc" # -o test.csv"
     # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug " # -mCSV -sI  -nW -ct cyc" # -o test.csv"
-    # # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV -nW --extract_read_group" #  -ct cyc" # -o test.csv"
+    cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
     # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
     # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
     # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
     # # #             --no_wobble"
     # # # print (cmd)
-    # args = parser.parse_args(cmd.split())
+    args = parser.parse_args(cmd.split())
     ################## PRODUCTTION ############################
-    args = parser.parse_args()
+    # args = parser.parse_args()
     # ============================================================
     adict = check_args(args)
     import os
-    os.environ['MALLOC_TRIM_THRESHOLD_'] = "65536"
+    # os.environ['MALLOC_TRIM_THRESHOLD_'] = "65536"
+    os.environ['MALLOC_TRIM_THRESHOLD_'] = "32178"
     from dask.distributed import Client, LocalCluster
-    cluster = LocalCluster(n_workers=1, threads_per_worker=4, memory_limit='8GB')
+    cluster = LocalCluster(n_workers=4, threads_per_worker=4, memory_limit='4GB')
     client = Client(cluster)
-    # print(client.dashboard_link)
+    logger.info("dask dashbord url: %s", client.dashboard_link)
 
     #===================================================
     logger.info("starting preprocessing....")
@@ -559,11 +560,12 @@ if __name__ == "__main__":
     if type(adict[UARGS.OUTFILE]) is io.TextIOWrapper: # stdout
         print(ddf_profile.compute().to_string(), file=adict[UARGS.OUTFILE])
     else: # filename
-        logger.debug("Profile saving to %s...", adict[UARGS.OUTFILE])
-        logger.debug("Dask partitions number: %d", ddf_profile.npartitions)
-        ddf_profile.to_csv(adict[UARGS.OUTFILE], single_file=not adict[UARGS.MULTIPLE_CSV_OUTPUT])
+        logger.info("Profile saving to %s...", adict[UARGS.OUTFILE])
+        logger.info("Dask # of partitions : %d", ddf_profile.npartitions)
+        single = not adict[UARGS.MULTIPLE_CSV_OUTPUT]
+        ddf_profile.to_csv(adict[UARGS.OUTFILE], compute=True, single_file=single)
         logger.info("Profile saved - END")
-
+        print(ddf_profile.head())
     # Shutdown the Dask client
     client.close()
     cluster.close()
