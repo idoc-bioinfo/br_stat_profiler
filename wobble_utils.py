@@ -7,13 +7,13 @@ import dask.dataframe as dd
 import dask
 from dask import delayed
 
-from constants import RT2_STAT, RC_TAB2, stat_ddf_schema
+from constants import RT2_STAT, RC_TAB2, REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
 # pylint: disable=no-member
 from log_utils import logger
 
 REPORT_WOBBLES_PROGRESS = 2500
-FACTOR = 4
-CHUNK_SIZE = REPORT_WOBBLES_PROGRESS * FACTOR  # number of woble df data
+CHUNK_SIZE_FACTOR = 0.5
+CHUNK_SIZE = REPORT_WOBBLES_PROGRESS * CHUNK_SIZE_FACTOR  # number of woble df data
 # CHUNK_SIZE = 10000 * 4  # number of woble df data
 
 class WobbleUtil:
@@ -158,19 +158,20 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
 
     # Add column with the wobbled k_mer value
     # wob_score_df.insert(RT2_STAT.COV_TYPE_COL_IDX, cov_type, wobbled_k_mer)
-    return wob_score_df
+    # return wob_score_df
+    return wob_score_df[REDUCED_STAT_DF_COLS]
 
 @dask.delayed
 def _calculate_wobble_stat_new(stat_df, wobbled_k_mer):
         # extract the rows with k-mers that matches the wob_k_mer of interest
-        wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
-            apply(lambda x, w_k_mer=wobbled_k_mer: WobbleUtil.match_k_mer(wobbled_k_mer, x))]
+    wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
+        apply(lambda x, w_k_mer=wobbled_k_mer: WobbleUtil.match_k_mer(wobbled_k_mer, x))]
 
-        if wob_df.empty: # no rows with wob_k_mer matching
-            return wob_df
+    if wob_df.empty: # no rows with wob_k_mer matching
+        return wob_df
 
-        return calculate_wobble_stat_new(wob_df.copy(), wobbled_k_mer)
-
+    # return calculate_wobble_stat_new(wob_df, wobbled_k_mer)
+    return calculate_wobble_stat_new(wob_df.copy(), wobbled_k_mer)
 
 
 def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
@@ -233,7 +234,8 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
         concatenated_chunks.append(ddf_chunk)
         logger.info("get_wobble_data: ddf_chunk %d concatenated (LAST)", len(concatenated_chunks))
 
-    return dd.concat(concatenated_chunks).astype(stat_ddf_schema)
+    return dd.concat(concatenated_chunks).astype(reduced_stat_ddf_scheme)
+    # return dd.concat(concatenated_chunks).astype(stat_ddf_schema)
 
 if __name__ == "__main__":
     TEST_DIR = "./data/intermediates_files"

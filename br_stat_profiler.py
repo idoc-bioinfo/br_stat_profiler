@@ -11,7 +11,8 @@ import numpy as np
 # from sklearn.preprocessing import StandardScaler
 
 # usr-defined dependencies
-from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT, stat_ddf_schema
+from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT \
+    ,REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
 # pylint: disable=no-member
 
 # from usr_props import UserProperties
@@ -240,7 +241,7 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
 
     return cyc_rt2_df
 
-def ddf_get_missing_values(stat_ddf, full_cov_collection):
+def ddf_get_missing_values(stat_ddf, full_cov_collection, cov_type):
     """Adds to a stat_df all the missing covariates from the FULL covariates
     colleciton with None values of the statisics
     Args:
@@ -250,7 +251,7 @@ def ddf_get_missing_values(stat_ddf, full_cov_collection):
     Returns:
         pd.Dataframe: stat_df with additional rows for the missing covariates (None value)
     """
-    cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]
+    # cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]
     logger.info("completing missing kmers/cyc: cov_type=%s", cov_type)
     def subtract_set(x):
         return list(set(full_cov_collection) - set(x))
@@ -296,8 +297,10 @@ def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
         only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
         wob_data_ddf = ddf_get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
-        rt2_stat_ddf = dd.from_pandas(rt2_stat_df, npartitions=1)
-        rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(stat_ddf_schema)
+        rt2_stat_ddf = dd.from_pandas(rt2_stat_df[REDUCED_STAT_DF_COLS], npartitions=1)
+        # rt2_stat_ddf = dd.from_pandas(rt2_stat_df, npartitions=1)
+        # rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(stat_ddf_schema)
+        rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(reduced_stat_ddf_scheme)
     else: # cov_type == RC_TAB2.CYC_COV or NO_WOBBLE
         rt2_stat_ddf = dd.from_pandas(rt2_stat_df, npartitions=1)
 
@@ -315,9 +318,11 @@ def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
         rt2_stat_ddf.to_csv(output_csv_file, single_file=False)
         logger.info("_prepare_stat_ddf: intermediate file Save")
 
-    missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library)
+    # missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library)
+    missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library, cov_type)
     if len(missing_ddf.index) != 0:
-        rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(stat_ddf_schema)
+        # rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(stat_ddf_schema)
+        rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(reduced_stat_ddf_scheme)
     rt2_stat_ddf = ddf_add_id_column(rt2_stat_ddf)
     logger.debug("_prepare_stat_ddf: Dask partitions number: %d", rt2_stat_ddf.npartitions)
     return rt2_stat_ddf
@@ -508,29 +513,30 @@ if __name__ == "__main__":
     parser = load_parser()
     # testing  code
     # ################### TESTING ############################
-    RECAL_TABLE_DIR = "./data/test_bqsr/"
-    RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.4"
-    REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
-    # # # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt " # -nW -ct cyc" # -o test.csv"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug " # -mCSV -sI  -nW -ct cyc" # -o test.csv"
-    cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
-    # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
-    # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
-    # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
-    # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
-    # # #             --no_wobble"
-    # # # print (cmd)
-    args = parser.parse_args(cmd.split())
+    # RECAL_TABLE_DIR = "./data/test_bqsr/"
+    # # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
+    # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
+    # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt " # -nW -ct cyc" # -o test.csv"
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 10 -mL 20GB" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
+    # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
+    # # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
+    # # # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
+    # # # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
+    # # # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
+    # # # # #             --no_wobble -V debug -cN 10 -mL 20GB"
+    # # # # # print (cmd)
+    # args = parser.parse_args(cmd.split())
     ################## PRODUCTTION ############################
-    # args = parser.parse_args()
+    args = parser.parse_args()
     # ============================================================
     adict = check_args(args)
     import os
     # os.environ['MALLOC_TRIM_THRESHOLD_'] = "65536"
     os.environ['MALLOC_TRIM_THRESHOLD_'] = "32178"
     from dask.distributed import Client, LocalCluster
-    cluster = LocalCluster(n_workers=4, threads_per_worker=4, memory_limit='4GB')
+    cluster = LocalCluster(n_workers=adict[UARGS.WORKERS_NUM],
+                           threads_per_worker=2, memory_limit=adict[UARGS.MEMORY_LIMIT])
     client = Client(cluster)
     logger.info("dask dashbord url: %s", client.dashboard_link)
 
@@ -565,7 +571,7 @@ if __name__ == "__main__":
         single = not adict[UARGS.MULTIPLE_CSV_OUTPUT]
         ddf_profile.to_csv(adict[UARGS.OUTFILE], compute=True, single_file=single)
         logger.info("Profile saved - END")
-        print(ddf_profile.head())
+        # print(ddf_profile.head())
     # Shutdown the Dask client
     client.close()
     cluster.close()

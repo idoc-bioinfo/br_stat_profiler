@@ -66,6 +66,8 @@ class UARGS:
     EXTRACT_READ_GROUP          =   "extract_read_group"
     DEBUG_SAVE_INTERMEDIATE     =   "save_intermediate"
     MULTIPLE_CSV_OUTPUT         =   "multiple_csv_output"
+    WORKERS_NUM                 =   "workers_num"
+    MEMORY_LIMIT                =   "memory_limit"
 
 
 class PRVT_ARG:      # private arguments
@@ -276,6 +278,23 @@ ARGS_PROPERTIES = {
         ArgPropKey.SHORT_FLAG:  '-sI',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.DEBUG_SAVE_INTERMEDIATE,
         ArgPropKey.ACTION:      'store_true',
+    },
+    UARGS.WORKERS_NUM: {
+        ArgPropKey.DEFAULT:     2,
+        ArgPropKey.TYPE:        int,
+        ArgPropKey.HELP:        'Number of workers(cores) to parallize the wobbles calculation',
+        ArgPropKey.SHORT_FLAG: '-cN',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.WORKERS_NUM,
+        ArgPropKey.METAVAR:     '<' + 'int [1-cores#]' + '>',
+    },
+    UARGS.MEMORY_LIMIT: {
+        ArgPropKey.DEFAULT:     '8GB',
+        ArgPropKey.TYPE:        str,
+        ArgPropKey.CHOICES:     ["4GB", "8GB", "12GB", "16GB", "20GB"],
+        ArgPropKey.HELP:        'Soft Memory limit managed by Dask',
+        ArgPropKey.SHORT_FLAG: '-mL',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MEMORY_LIMIT,
+        ArgPropKey.METAVAR:     '<' + ' choices [8GB] '  + '>',
     },
 }
 

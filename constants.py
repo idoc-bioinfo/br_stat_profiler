@@ -1,6 +1,3 @@
-import numpy as np
-import dask.dataframe as dd
-
 class RT_HDR:
     TAB_PROP_PATTERN    = r'^#:GATKTable:.*;' # Pattern for table properties
     TAB_NAME_PATTERN    = r'^#:GATKTable:.*(?<!;)$'  # Pattern for table name
@@ -85,3 +82,15 @@ stat_ddf_schema = {
     RT2_STAT.BIN_AVG_QLTY_ERR_COL   :   'Float64',
     # RT2_STAT.ID_COL                 : str,
 }
+
+reduced_stat_ddf_scheme = {
+    RC_TAB2.RG_COL                  :   str,
+    RC_TAB2.RG_SCORE_BIN_COL        :   'Int8',
+    RC_TAB2.CNTXT_COV               :   str,
+    RT2_STAT.BIN_AVG_QLTY_ERR_COL   :   'Float64',
+}
+
+REDUCED_STAT_DF_COLS = list(reduced_stat_ddf_scheme.keys())
+
+if __name__ == "__main__":
+    print(REDUCED_STAT_DF_COLS)
