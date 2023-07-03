@@ -12,9 +12,11 @@ from constants import RT2_STAT, RC_TAB2, REDUCED_STAT_DF_COLS, reduced_stat_ddf_
 from log_utils import logger
 
 REPORT_WOBBLES_PROGRESS = 2500
-CHUNK_SIZE_FACTOR = 0.5
-CHUNK_SIZE = REPORT_WOBBLES_PROGRESS * CHUNK_SIZE_FACTOR  # number of woble df data
+# CHUNK_SIZE_FACTOR = 2
+# CHUNK_SIZE = REPORT_WOBBLES_PROGRESS * CHUNK_SIZE_FACTOR  # number of woble df data
 # CHUNK_SIZE = 10000 * 4  # number of woble df data
+PANDAS_CHUNK_SIZE = 1500   # parallelized
+PANDA_CHUNKS_IN_DASK = 10
 
 class WobbleUtil:
     patterns_dict = {
@@ -67,13 +69,14 @@ class WobbleUtil:
         return (tested_str.count('R') + tested_str.count('Y'))
 
     @staticmethod
-    def count_M_S_W_occ(tested_str: str):
-        """Counts 'M' and 'S' and 'W' number combined """
-        return (tested_str.count('M') + tested_str.count('S')+ tested_str.count('W'))
+    def count_K_M_S_W_occ(tested_str: str):
+        """Counts 'K' and 'M' and 'S' and 'W' number combined """
+        return (tested_str.count('K') + tested_str.count('M') + \
+            tested_str.count('S')+ tested_str.count('W'))
 
     @staticmethod
     def count_B_D_H_V_occ(tested_str: str):
-        """Counts 'B' and 'D' and 'V' number combined """
+        """Counts 'B' and 'D' and 'H' and 'V' number combined """
         return (tested_str.count('B') + tested_str.count('D') + \
             tested_str.count('H') + tested_str.count('V'))
 
@@ -81,7 +84,7 @@ class WobbleUtil:
     def get_full_wobbled_k_mers_list(K,
                                      max_wob_N_occ,
                                      max_wob_R_Y_occ,
-                                     max_wob_M_S_W_occ,
+                                     max_wob_K_M_S_W_occ,
                                      max_wob_B_D_H_V_occ):
 
         """
@@ -103,7 +106,7 @@ class WobbleUtil:
             s for s in wobble_str_lst \
                 if (WobbleUtil.count_N_occ(s) <= max_wob_N_occ) and \
                     (WobbleUtil.count_R_Y_occ(s) <= max_wob_R_Y_occ) and \
-                    (WobbleUtil.count_M_S_W_occ(s) <= max_wob_M_S_W_occ) and \
+                    (WobbleUtil.count_K_M_S_W_occ(s) <= max_wob_K_M_S_W_occ) and \
                     (WobbleUtil.count_B_D_H_V_occ(s) <= max_wob_B_D_H_V_occ)
             ]
         # logger.info(f"get_full_wobbled_k_mers_list: list ready (len={len(filtered_wob_strings)})")
@@ -168,7 +171,7 @@ def _calculate_wobble_stat_new(stat_df, wobbled_k_mer):
         apply(lambda x, w_k_mer=wobbled_k_mer: WobbleUtil.match_k_mer(wobbled_k_mer, x))]
 
     if wob_df.empty: # no rows with wob_k_mer matching
-        return wob_df
+        return wob_df[REDUCED_STAT_DF_COLS]
 
     # return calculate_wobble_stat_new(wob_df, wobbled_k_mer)
     return calculate_wobble_stat_new(wob_df.copy(), wobbled_k_mer)
@@ -192,7 +195,7 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
     # looping over all the woobled k-mer
     current_chunk = []
     concatenated_chunks = []
-
+    chunks_lvl_1 = []
     for i, wob_k_mer in enumerate(wobbled_k_mers_list):
         if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:
             # Should never happen in a real world scenario (only in testing)
@@ -218,38 +221,58 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
             logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)",
                         (i+1), (i+1)*100/wobbled_k_mer_count)
 
-        if len(current_chunk) == CHUNK_SIZE:
+        if len(current_chunk) == PANDAS_CHUNK_SIZE:
             concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-            ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
-            # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
-            concatenated_chunks.append(ddf_chunk)
+            chunks_lvl_1.append(concatenated_df)
             current_chunk = []
-            logger.info("get_wobble_data: ddf_chunk %d concatenated", len(concatenated_chunks))
 
-    # Concatenate the remaining DataFrames
+        if len(chunks_lvl_1) == PANDA_CHUNKS_IN_DASK:
+        # if len(current_chunk) == CHUNK_SIZE:
+            concatenated_df_lvl_1 = pd.concat(chunks_lvl_1, axis=0, ignore_index=True)
+            ddf_chunk = dd.from_pandas(concatenated_df_lvl_1, npartitions=1)
+            concatenated_chunks.append(ddf_chunk)
+            chunks_lvl_1 = []
+            # concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
+            # ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
+            # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
+            # current_chunk = []
+            logger.info("get_wobble_data: ddf_chunk %d concatenated", len(concatenated_chunks))
+        # Concatenate the remaining DataFrames
+
     if current_chunk:
         concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-        ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
-        # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
+        chunks_lvl_1.append(concatenated_df)
+        current_chunk = []
+
+    # Concatenate the remaining DataFrames
+    if chunks_lvl_1:
+        concatenated_df_lvl_1 = pd.concat(chunks_lvl_1, axis=0, ignore_index=True)
+        ddf_chunk = dd.from_pandas(concatenated_df_lvl_1, npartitions=1)
         concatenated_chunks.append(ddf_chunk)
+        chunks_lvl_1 = []
+        # concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
+        # ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
+        # # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
+        # concatenated_chunks.append(ddf_chunk)
         logger.info("get_wobble_data: ddf_chunk %d concatenated (LAST)", len(concatenated_chunks))
 
     return dd.concat(concatenated_chunks).astype(reduced_stat_ddf_scheme)
     # return dd.concat(concatenated_chunks).astype(stat_ddf_schema)
 
 if __name__ == "__main__":
-    TEST_DIR = "./data/intermediates_files"
-    FILE_ONLY_WOB_K_MERS = "only_wobbled_k_mers.txt"
-    FILE_RT2_STAT_DF = "rt2_stat_df.csv"
-    import os
-    FULLPATH_W_K_MERS = os.path.join(TEST_DIR, FILE_ONLY_WOB_K_MERS)
-    FULLPATH_RT2_STAT_DF = os.path.join(TEST_DIR, FILE_RT2_STAT_DF)
+    pass
+    # TEST_DIR = "./data/intermediates_files"
+    # FILE_ONLY_WOB_K_MERS = "only_wobbled_k_mers.txt"
+    # FILE_RT2_STAT_DF = "rt2_stat_df.csv"
+    # import os
+    # FULLPATH_W_K_MERS = os.path.join(TEST_DIR, FILE_ONLY_WOB_K_MERS)
+    # FULLPATH_RT2_STAT_DF = os.path.join(TEST_DIR, FILE_RT2_STAT_DF)
 
-    only_wobbled_k_mers = []
-    with open(FULLPATH_W_K_MERS, 'r', encoding="utf-8") as file:
-        for line in file:
-            only_wobbled_k_mers.append(line.strip())
-    rt2_stat_df = pd.read_csv(FULLPATH_RT2_STAT_DF)
-    print(rt2_stat_df.shape)
-    print(rt2_stat_df.head())
-    print(only_wobbled_k_mers[1:5])
+    # only_wobbled_k_mers = []
+    # with open(FULLPATH_W_K_MERS, 'r', encoding="utf-8") as file:
+    #     for line in file:
+    #         only_wobbled_k_mers.append(line.strip())
+    # rt2_stat_df = pd.read_csv(FULLPATH_RT2_STAT_DF)
+    # print(rt2_stat_df.shape)
+    # print(rt2_stat_df.head())
+    # print(only_wobbled_k_mers[1:5])

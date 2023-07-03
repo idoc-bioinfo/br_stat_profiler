@@ -3,6 +3,8 @@ import itertools
 import math
 import uuid
 import io
+import os
+import sys
 import pandas as pd
 import dask.dataframe as dd
 from dask import delayed
@@ -302,7 +304,7 @@ def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
         # rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(stat_ddf_schema)
         rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(reduced_stat_ddf_scheme)
     else: # cov_type == RC_TAB2.CYC_COV or NO_WOBBLE
-        rt2_stat_ddf = dd.from_pandas(rt2_stat_df, npartitions=1)
+        rt2_stat_ddf = dd.from_pandas(rt2_stat_df[REDUCED_STAT_DF_COLS], npartitions=1)
 
     # print("#1\n",rt2_stat_ddf.head())
     if args_dict[UARGS.QERR_SYM_CUTOFF]:
@@ -314,9 +316,10 @@ def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
     if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
         output_csv_file = f'{uuid.uuid4()}.csv'
         logger.info("_prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-        # rt2_stat_ddf.to_csv(output_csv_file, single_file=not args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
-        rt2_stat_ddf.to_csv(output_csv_file, single_file=False)
-        logger.info("_prepare_stat_ddf: intermediate file Save")
+        logger.info("prepare_stat_ddf: intermediate file columns \n %s", rt2_stat_ddf.columns)
+        single_f = not bool(args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
+        rt2_stat_ddf.to_csv(output_csv_file, single_file=single_f)
+        logger.info("_prepare_stat_ddf: intermediate file Saved")
 
     # missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library)
     missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library, cov_type)
@@ -324,9 +327,9 @@ def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
         # rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(stat_ddf_schema)
         rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(reduced_stat_ddf_scheme)
     rt2_stat_ddf = ddf_add_id_column(rt2_stat_ddf)
+    logger.debug(rt2_stat_ddf.columns)
     logger.debug("_prepare_stat_ddf: Dask partitions number: %d", rt2_stat_ddf.npartitions)
     return rt2_stat_ddf
-
 
 def prepare_stat_ddf(rt2_df, cov_type, args_dict):
     """Preparation a statistics table before profile extraction
@@ -377,27 +380,24 @@ def prepare_stat_ddf(rt2_df, cov_type, args_dict):
             full_library = WobbleUtil.get_full_wobbled_k_mers_list(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
                                                          args_dict[UARGS.MAX_WOB_N_OCC],
                                                          args_dict[UARGS.MAX_WOB_R_Y_OCC],
-                                                         args_dict[UARGS.MAX_WOB_M_S_W_OCC],
+                                                         args_dict[UARGS.MAX_WOB_K_M_S_W_OCC],
                                                          args_dict[UARGS.MAX_WOB_B_D_H_V_OCC])
-            # with open("full_library_list", 'w') as file:
-            #     for item in full_library:
-            #         file.write(item + '\n')
 
     # # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
 
     # rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
     rt2_stat_ddf = _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict)
-    # generate uniform order before profile extraction
-    # rt2_stat_df = rt2_stat_df.sort_values(by=[RC_TAB2.RG_COL, RT2_STAT.ID_COL], ignore_index=True)
     logger.info("prepare_stat_ddf finished")
-
+    rt2_stat_ddf = rt2_stat_ddf.persist()
     # DEBUG : saving intermediate file for the case of later memory crash
     if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
         output_csv_file = f'{uuid.uuid4()}.csv'
         logger.info("prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-        # rt2_stat_ddf.to_csv(output_csv_file, single_file=not args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
-        rt2_stat_ddf.to_csv(output_csv_file, single_file=False)
+        logger.info("prepare_stat_ddf: intermediate file columns \n %s", rt2_stat_ddf.columns)
+        single_f = not bool(args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
+        rt2_stat_ddf.to_csv(output_csv_file, single_file=single_f)
+        # rt2_stat_ddf.to_csv(output_csv_file, single_file=False)
         logger.info("prepare_stat_ddf: intermediate file Saved")
 
     return rt2_stat_ddf
@@ -441,10 +441,12 @@ def ddf_extract_profile(stat_ddf, args_dict):
     stat_ddf = stat_ddf.sort_values(by=RT2_STAT.ID_COL)
     logger.debug("Extracting profile: profile sorted !!")
     stat_ddf = stat_ddf.categorize(columns=[RC_TAB2.RG_COL,RT2_STAT.ID_COL])
+    stat_ddf = stat_ddf.persist() # to reduce the calculation graph
     logger.debug("Extracting profile: categorized !!")
     q_err_profile_ddf = stat_ddf.pivot_table(columns=RC_TAB2.RG_COL,
                                                 values=RT2_STAT.BIN_AVG_QLTY_ERR_COL,
                                                 index = RT2_STAT.ID_COL)
+
 
     logger.debug("pivot_table: Dask partitions number: %d", q_err_profile_ddf.npartitions)
     # zscoring if requested
@@ -518,64 +520,55 @@ if __name__ == "__main__":
     # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
     # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
     # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt " # -nW -ct cyc" # -o test.csv"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 10 -mL 20GB" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 8 -mL 8GB -mCSV -sI" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
     # # # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
     # # # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
     # # # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
     # # # # #             --no_wobble -V debug -cN 10 -mL 20GB"
-    # # # # # print (cmd)
+    # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
+    #     --scr_bin_count 3 --min_score 20 --extract_read_group \
+    #     --max_wob_N_occ 0 --max_wob_R_Y_occ 0 --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
+    #     --no_wobble"
     # args = parser.parse_args(cmd.split())
     ################## PRODUCTTION ############################
     args = parser.parse_args()
     # ============================================================
     adict = check_args(args)
-    import os
-    # os.environ['MALLOC_TRIM_THRESHOLD_'] = "65536"
+    logger.info("Command Line:\n %s", ' '.join(sys.argv))
+    # Setting up Dask cluter
+    logger.info("setting up dask cluter")
     os.environ['MALLOC_TRIM_THRESHOLD_'] = "32178"
     from dask.distributed import Client, LocalCluster
     cluster = LocalCluster(n_workers=adict[UARGS.WORKERS_NUM],
-                           threads_per_worker=2, memory_limit=adict[UARGS.MEMORY_LIMIT])
+                           threads_per_worker=4, memory_limit=adict[UARGS.MEMORY_LIMIT])
     client = Client(cluster)
     logger.info("dask dashbord url: %s", client.dashboard_link)
-
-    #===================================================
-    logger.info("starting preprocessing....")
+    # Profile processing
+    logger.info("Start profile preprocessing....")
     rt2_pre_stat_df = preprocess_GATK_report(adict)
+    logger.info("Profile preprocessed!!")
+    logger.info("Starting profile preparation")
     ddf_profile = ddf_profile_rt(rt2_pre_stat_df, adict)
+    logger.info("Profile prepared")
 
-    ####################################### DEBUG #########################
-    # UUID_FILENAME = "/home/ido/br_stat_profiler/e6509c01-cfc2-42a3-8c4c-78ba5aa2328b.csv" +"/*.part"
-    # # prepare_stat_ddf(rt2_pre_stat_df, RC_TAB2.CNTXT_COV, adict)
-    # # test_ddf = dd.read_csv(UUID_FILENAME, assume_missing=True)
-    # # print("CSV read !!!")
-    # import time
-    # start_time = time.time()
-    # profile = profile_rt(rt2_pre_stat_df, adict)
-    # print("elapse:", time.time() - start_time)
-
-    # print(profile.head())
-    # start_time = time.time()
-    # ddf_profile = ddf_profile_rt(rt2_pre_stat_df, adict)
-    # print("elapse:", time.time() - start_time)
-    # print(type(ddf_profile))
-    # print("final: \n", ddf_profile.head())
-    ########################## PRODUCTION ############################
-    # save profile
+    # save profile to file/ stdout
     if type(adict[UARGS.OUTFILE]) is io.TextIOWrapper: # stdout
         print(ddf_profile.compute().to_string(), file=adict[UARGS.OUTFILE])
     else: # filename
         logger.info("Profile saving to %s...", adict[UARGS.OUTFILE])
         logger.info("Dask # of partitions : %d", ddf_profile.npartitions)
-        single = not adict[UARGS.MULTIPLE_CSV_OUTPUT]
-        ddf_profile.to_csv(adict[UARGS.OUTFILE], compute=True, single_file=single)
+        single_f = not bool(adict[UARGS.MULTIPLE_CSV_OUTPUT])
+        ddf_profile.to_csv(adict[UARGS.OUTFILE], compute=True, single_file=single_f)
+        ddf_profile.to_csv(adict[UARGS.OUTFILE], single_file=single_f)
         logger.info("Profile saved - END")
-        # print(ddf_profile.head())
-    # Shutdown the Dask client
+    # print(ddf_profile.head())
+    # Shutting down the Dask client
     client.close()
     cluster.close()
     # ################### TESTING ############################
+    # print(ddf_profile.head())
     # print(profile.head())
     # # print(type(adict[UARGS.OUTFILE]))
     # # create new dataframe

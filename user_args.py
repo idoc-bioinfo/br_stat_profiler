@@ -42,10 +42,10 @@ VERSION_NUMBER='1.2'
 
 class UARGS:
     """ User Arguments"""
-    INFILE              =   "infile"
-    OUTFILE             =   "outfile"
-    SCORE_BINS_COUNT    =   "scr_bin_count"
-    MIN_SCORE           =   "min_score"
+    INFILE                      =   "infile"
+    OUTFILE                     =   "outfile"
+    SCORE_BINS_COUNT            =   "scr_bin_count"
+    MIN_SCORE                   =   "min_score"
     MAX_SCORE                   =   "max_score"
     MIN_ERR_OBSRV               =   "min_err_observed"
     CYC_BINS_COUNT              =   "cyc_bin_count"
@@ -59,7 +59,7 @@ class UARGS:
     NO_WOBBLE                   =   "no_wobble"
     MAX_WOB_N_OCC               =   "max_wob_N_occ"
     MAX_WOB_R_Y_OCC             =   "max_wob_R_Y_occ"
-    MAX_WOB_M_S_W_OCC           =   "max_wob_M_S_W_occ"
+    MAX_WOB_K_M_S_W_OCC         =   "max_wob_K_M_S_W_occ"
     MAX_WOB_B_D_H_V_OCC         =   "max_wob_B_D_H_V_occ"
     VERBOSE                     =   "verbose"
     LOG_FILE                    =   "log_file"
@@ -135,7 +135,7 @@ ARGS_PROPERTIES = {
         ArgPropKey.DEFAULT: 3,
         ArgPropKey.TYPE:    int,
         ArgPropKey.MIN:     1,
-        ArgPropKey.MAX:     10,
+        ArgPropKey.MAX:     13,
         ArgPropKey.HELP:    '# of bins to divide the QualityScore values (The profiler further averages the QError rate in each bin).',
         ArgPropKey.SHORT_FLAG: '-sb',
         ArgPropKey.LONG_FLAG:   '--'+ UARGS.SCORE_BINS_COUNT,
@@ -230,12 +230,12 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_R_Y_OCC,
         ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
     },
-    UARGS.MAX_WOB_M_S_W_OCC: {
+    UARGS.MAX_WOB_K_M_S_W_OCC: {
         ArgPropKey.DEFAULT:     3,
         ArgPropKey.TYPE:        int,
-        ArgPropKey.HELP:        'Maximal occurence of wobble positions M, S, W (with both Purine and Pyrmidine) in the k-mers statistic calculation',
-        ArgPropKey.SHORT_FLAG: '-wMSW',
-        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_M_S_W_OCC,
+        ArgPropKey.HELP:        'Maximal occurence of wobble positions K, M, S, W (with both Purine and Pyrmidine) in the k-mers statistic calculation',
+        ArgPropKey.SHORT_FLAG: '-wKMSW',
+        ArgPropKey.LONG_FLAG: '--' + UARGS.MAX_WOB_K_M_S_W_OCC,
         ArgPropKey.METAVAR:     '<' + 'int [3]' + '>',
     },
     UARGS.MAX_WOB_B_D_H_V_OCC: {
