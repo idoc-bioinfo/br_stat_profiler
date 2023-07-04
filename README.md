@@ -47,27 +47,26 @@ Below is a schematic description of the profiling algorithm described for a sing
 
 ```plaintext
 usage: br_stat_profiler.py [-h] [--version] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>]
-                    [-lg <*.* [stderr]>] [-mq <int min=1 [20]>] [-mxq <int max=100 [100]>]
-                    [-eo <int 1 to 10 [3]>] [-sb <int 1 to 10 [3]>] [-cb <int 1 to 15 [10]>]
-                    [-mic <int [1]>] [-mxc <int [150]>] [-nan <float [None]>] [-sym] [-z]
-                    [-ct <choices [cntxt]>] [-co <float [-20]>] [-nW] [-wN <int [2]>]
-                    [-wRY <int [3]>] [-wMSW <int [3]>] [-wBDHV <int [3]>] [-V <choices [info]>]
-                    [-xRG] [-mCSV] [-sI]
+                           [-lg <*.* [stderr]>] [-mq <int min=1 [20]>] [-mxq <int max=100 [100]>]
+                           [-eo <int 1 to 13 [3]>] [-sb <int 1 to 13 [3]>] [-cb <int 1 to 15 [10]>]
+                           [-mic <int [1]>] [-mxc <int [150]>] [-nan <float [None]>] [-sym] [-z]
+                           [-ct <choices [cntxt]>] [-co <float [-20]>] [-nW] [-wN <int [2]>] [-wRY <int [3]>]
+                           [-wKMSW <int [3]>] [-wBDHV <int [3]>] [-V <choices [info]>] [-xRG] [-sI]
+                           [-cN <int [1-cores#]>] [-mL < choices [8GB] >]
 
-br_stat_profiler (v1.2) - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles
-that can be compared/clustered downstream. It generates a separate profile for each ReadGroup
-in the stat report and tabulates them for easy analysis. The profiles can be saved in a CSV
-format or streamed as output for further processing.
+br_stat_profiler (v1.2) - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can
+be compared/clustered downstream. It generates a separate profile for each ReadGroup in the stat report
+and tabulates them for easy analysis. The profiles can be saved in a CSV format or streamed as output
+for further processing.
 
 options:
   -h, --help            show this help message and exit
   --version             show program's version number and exit
   -i <GATKReport [stdin]>, --infile <GATKReport [stdin]>
-                        Path for file, or stdin with Existing GATK (v4.4.0.0) BaseRecalibrator
-                        report. (default=stdin)
+                        Path for file, or stdin with Existing GATK (v4.4.0.0) BaseRecalibrator report.
+                        (default=stdin)
   -o <*.csv [stdout]>, --outfile <*.csv [stdout]>
-                        Path of NON-EXISTING .csv file for the generated profile.
-                        (default=stdout)
+                        Path of NON-EXISTING .csv file for the generated profile. (default=stdout)
   -lg <*.* [stderr]>, --log_file <*.* [stderr]>
                         NON-EXISTING file for profile metadata . (default=<_io.TextIOWrapper
                         name='<stderr>' mode='w' encoding='utf-8'>)
@@ -75,59 +74,61 @@ options:
                         Minimal QualityScore value for profiling (default=20)
   -mxq <int max=100 [100]>, --max_score <int max=100 [100]>
                         Maximal QualityScore value for profiling (default=100)
-  -eo <int 1 to 10 [3]>, --min_err_observed <int 1 to 10 [3]>
+  -eo <int 1 to 13 [3]>, --min_err_observed <int 1 to 13 [3]>
                         Minimal Number of Errornous Observations for profiling (default=100)
-  -sb <int 1 to 10 [3]>, --scr_bin_count <int 1 to 10 [3]>
-                        # of bins to divide the QualityScore values (The profiler further
-                        averages the QError rate in each bin). (default=3)
+  -sb <int 1 to 13 [3]>, --scr_bin_count <int 1 to 13 [3]>
+                        # of bins to divide the QualityScore values (The profiler further averages the
+                        QError rate in each bin). (default=3)
   -cb <int 1 to 15 [10]>, --cyc_bin_count <int 1 to 15 [10]>
-                        The # of bins to divide reading cycle covariate so that reads are cut
-                        into equal fragments. QEerror is averaged for each cycle bin
-                        (=fragment). (default=10)
+                        The # of bins to divide reading cycle covariate so that reads are cut into
+                        equal fragments. QEerror is averaged for each cycle bin (=fragment).
+                        (default=10)
   -mic <int [1]>, --min_cyc <int [1]>
-                        In cycles profiling, The start position in the read. Irrelevant for
-                        context profiling. (default=1)
+                        In cycles profiling, The start position in the read. Irrelevant for context
+                        profiling. (default=1)
   -mxc <int [150]>, --max_cyc <int [150]>
                         In cycles profiling, last position in the read. Irrelevant for context
                         profiling. (default=150)
   -nan <float [None]>, --nan_rep <float [None]>
                         Optional Character filler for missing/cutoffed values.
   -sym, --qerr_cutoff_both_sides
-                        Symmetrical qerr cutoff. For example, for cutoff=3, QErrors below 3 and
-                        above -3 are cut (default=False)
-  -z, --zscore          ZScoring the final profile (preformed after the QErr cuttoff if
-                        requested). None values are ignored (default=False)
+                        Symmetrical qerr cutoff. For example, for cutoff=3, QErrors below 3 and above
+                        -3 are cut (default=False)
+  -z, --zscore          ZScoring the final profile (preformed after the QErr cuttoff if requested).
+                        None values are ignored (default=False)
   -ct <choices [cntxt]>, --cov_type <choices [cntxt]>
-                        Covariats type to profile QErrors. Profiling may take either the
-                        QErrors context or cycle or both (context + cycle). options=['cntxt',
-                        'cyc', 'cntxt_cyc'], (default=cntxt)
+                        Covariats type to profile QErrors. Profiling may take either the QErrors
+                        context or cycle or both (context + cycle). options=['cntxt', 'cyc',
+                        'cntxt_cyc'], (default=cntxt)
   -co <float [-20]>, --qerr_cutoff <float [-20]>
                         Cutoff for Qerror (for removal of an hypothetical noise) (default=-20)
-  -nW, --no_wobble      Do not calculate wobbled k-mers statistics - Include only k-mers with
-                        {A,C,G,T} (default=False)
+  -nW, --no_wobble      Do not calculate wobbled k-mers statistics - Include only k-mers with {A,C,G,T}
+                        (default=False)
   -wN <int [2]>, --max_wob_N_occ <int [2]>
-                        Maximal occurence of wobble positions N in the k-mers statistic
-                        calculation (default=2)
+                        Maximal occurence of wobble positions N in the k-mers statistic calculation
+                        (default=2)
   -wRY <int [3]>, --max_wob_R_Y_occ <int [3]>
-                        Maximal occurence of wobble positions R (Purines) and Y (Pyrmidines) in
-                        the k-mers statistic calculation (default=3)
-  -wMSW <int [3]>, --max_wob_M_S_W_occ <int [3]>
-                        Maximal occurence of wobble positions M, S, W (with both Purine and
+                        Maximal occurence of wobble positions R (Purines) and Y (Pyrmidines) in the
+                        k-mers statistic calculation (default=3)
+  -wKMSW <int [3]>, --max_wob_K_M_S_W_occ <int [3]>
+                        Maximal occurence of wobble positions K, M, S, W (with both Purine and
                         Pyrmidine) in the k-mers statistic calculation (default=3)
   -wBDHV <int [3]>, --max_wob_B_D_H_V_occ <int [3]>
                         Maximal occurence of wobble positions B,D,H,V (without A or C or G or T
                         respectfully) in the k-mers statistic calculation (default=2)
   -V <choices [info]>, --verbose <choices [info]>
-                        Verbosity level. In a non-silent mode (default), msgs are streamed to
-                        stderr (default) or logfile. options=['info', 'silent', 'debug'],
-                        (default=info)
+                        Verbosity level. In a non-silent mode (default), msgs are streamed to stderr
+                        (default) or logfile. options=['info', 'silent', 'debug'], (default=info)
   -xRG, --extract_read_group
-                        Extract read group name - from a ":" delimited ReadGroup String (first
-                        token) (default=False)
-  -mCSV, --multiple_csv_output
-                        Save ouptut table in multiple csv files (default=False)
+                        Extract read group name - from a ":" delimited ReadGroup String (first token)
+                        (default=False)
   -sI, --save_intermediate
                         Save Intermediate for the case of later memory crash (default=False)
+  -cN <int [1-cores#]>, --workers_num <int [1-cores#]>
+                        Number of workers(cores) to parallize the wobbles calculation (default=2)
+  -mL < choices [8GB] >, --memory_limit < choices [8GB] >
+                        Soft Memory limit managed by Dask options=['4GB', '8GB', '12GB', '16GB',
+                        '20GB'], (default=8GB)
 ```
 
 ### **Input**
