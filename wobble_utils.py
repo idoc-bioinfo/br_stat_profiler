@@ -1,22 +1,22 @@
 import itertools
 import re
 import math
+import os
 import numpy as np
 import pandas as pd
-import dask.dataframe as dd
 import dask
 from dask import delayed
+from dask.distributed import Client, LocalCluster
 
+from user_args import UARGS
 from constants import RT2_STAT, RC_TAB2, REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
 # pylint: disable=no-member
 from log_utils import logger
 
 REPORT_WOBBLES_PROGRESS = 2500
-# CHUNK_SIZE_FACTOR = 2
-# CHUNK_SIZE = REPORT_WOBBLES_PROGRESS * CHUNK_SIZE_FACTOR  # number of woble df data
-# CHUNK_SIZE = 10000 * 4  # number of woble df data
-PANDAS_CHUNK_SIZE = 1500   # parallelized
-PANDA_CHUNKS_IN_DASK = 10
+
+LVL_I_CHUNK_SIZE = 1500   # parallelized
+LVL_I_CHUNKS_IN_LVL_II = 10
 
 class WobbleUtil:
     patterns_dict = {
@@ -159,10 +159,25 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
     wob_score_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
         wob_score_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - wob_score_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
 
-    # Add column with the wobbled k_mer value
-    # wob_score_df.insert(RT2_STAT.COV_TYPE_COL_IDX, cov_type, wobbled_k_mer)
-    # return wob_score_df
     return wob_score_df[REDUCED_STAT_DF_COLS]
+
+
+
+def turn_on_dask(adict):
+    logger.info("setting up dask cluter")
+    global dask_cluster
+    global dask_client
+    # os.environ['MALLOC_TRIM_THRESHOLD_'] = "32178"
+    os.environ['MALLOC_TRIM_THRESHOLD_'] = "64356"
+    dask_cluster = LocalCluster(n_workers=adict[UARGS.WORKERS_NUM],
+                           threads_per_worker=4, memory_limit=adict[UARGS.MEMORY_LIMIT])
+    dask_client = Client(dask_cluster)
+    logger.info("dask dashbord url: %s", dask_client.dashboard_link)
+
+def turn_off_dask():
+    dask_client.close()
+    dask_cluster.close()
+    logger.info("dask cluter is turned off")
 
 @dask.delayed
 def _calculate_wobble_stat_new(stat_df, wobbled_k_mer):
@@ -176,8 +191,7 @@ def _calculate_wobble_stat_new(stat_df, wobbled_k_mer):
     # return calculate_wobble_stat_new(wob_df, wobbled_k_mer)
     return calculate_wobble_stat_new(wob_df.copy(), wobbled_k_mer)
 
-
-def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
+def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
     """Calculates statistics for all the wobbled k-mers and concatenate it alltogether
 
     Args:
@@ -189,75 +203,57 @@ def ddf_get_wobble_data(stat_df, wobbled_k_mers_list):
         pd.Dataframe: combined table with non_wobbled and wobbled data
     """
     logger.info("get_wobble_data: start")
-    # wobbled_k_mers = WobbleUtil.remove_non_wobble(k_mers_list)
+
     wobbled_k_mer_count = len(wobbled_k_mers_list)
+    turn_on_dask(args_dict)
 
     # looping over all the woobled k-mer
-    current_chunk = []
-    concatenated_chunks = []
-    chunks_lvl_1 = []
+    current_chunks = []
+    chunks_lvl_I = []
+    chunks_lvl_II = []
+
+
     for i, wob_k_mer in enumerate(wobbled_k_mers_list):
-        if wob_k_mer in stat_df[RC_TAB2.CNTXT_COV].values:
-            # Should never happen in a real world scenario (only in testing)
-            continue
-        # # extract the rows with k-mers that matches the wob_k_mer of interest
-        # wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
-        #     apply(lambda x, w_k_mer=wob_k_mer: WobbleUtil.match_k_mer(w_k_mer, x))]
 
-        # if wob_df.empty: # no rows with wob_k_mer matching
-        #     continue
-
-        # #calculate the statistics of the wob_k_mer of interests
-        # temp_wob_df = calculate_wobble_stat_new(wob_df.copy(), wob_k_mer, cov_type = RC_TAB2.CNTXT_COV)
-        # current_chunk.append(temp_wob_df)
         #calculate the statistics of the wob_k_mer of interests
         temp_wob_df = _calculate_wobble_stat_new(stat_df, wob_k_mer)
 
         # if temp_wob_df.empty: # no rows with wob_k_mer matching
         #     continue
         # else:
-        current_chunk.append(temp_wob_df)
+        current_chunks.append(temp_wob_df)
         if (i+1) % REPORT_WOBBLES_PROGRESS == 0:
-            logger.info("get_wobble_data: wobbled_k_mer %d (%.1f%%)",
-                        (i+1), (i+1)*100/wobbled_k_mer_count)
+            logger.info("get_wobble_data: wobbled_k_mer %d/%d (%.1f%%)",
+                        (i+1), wobbled_k_mer_count, (i+1)*100/wobbled_k_mer_count)
 
-        if len(current_chunk) == PANDAS_CHUNK_SIZE:
-            concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-            chunks_lvl_1.append(concatenated_df)
-            current_chunk = []
+        if len(current_chunks) == LVL_I_CHUNK_SIZE:
+            concatenated_df = delayed(pd.concat)(current_chunks, axis=0, ignore_index=True).compute()
+            chunks_lvl_I.append(concatenated_df)
+            current_chunks = []
 
-        if len(chunks_lvl_1) == PANDA_CHUNKS_IN_DASK:
-        # if len(current_chunk) == CHUNK_SIZE:
-            concatenated_df_lvl_1 = pd.concat(chunks_lvl_1, axis=0, ignore_index=True)
-            ddf_chunk = dd.from_pandas(concatenated_df_lvl_1, npartitions=1)
-            concatenated_chunks.append(ddf_chunk)
-            chunks_lvl_1 = []
-            # concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-            # ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
-            # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
-            # current_chunk = []
-            logger.info("get_wobble_data: ddf_chunk %d concatenated", len(concatenated_chunks))
+        if len(chunks_lvl_I) == LVL_I_CHUNKS_IN_LVL_II:
+            concatenated_df_lvl_1 = pd.concat(chunks_lvl_I, axis=0, ignore_index=True)
+            chunks_lvl_II.append(concatenated_df_lvl_1)
+            chunks_lvl_I = []
+
+            logger.info("get_wobble_data:  %d chunks concatenated", len(chunks_lvl_II))
         # Concatenate the remaining DataFrames
 
-    if current_chunk:
-        concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-        chunks_lvl_1.append(concatenated_df)
-        current_chunk = []
+    if current_chunks:
+        concatenated_df = delayed(pd.concat)(current_chunks, axis=0, ignore_index=True).compute()
+        chunks_lvl_I.append(concatenated_df)
+        current_chunks = []
 
     # Concatenate the remaining DataFrames
-    if chunks_lvl_1:
-        concatenated_df_lvl_1 = pd.concat(chunks_lvl_1, axis=0, ignore_index=True)
-        ddf_chunk = dd.from_pandas(concatenated_df_lvl_1, npartitions=1)
-        concatenated_chunks.append(ddf_chunk)
-        chunks_lvl_1 = []
-        # concatenated_df = delayed(pd.concat)(current_chunk, axis=0, ignore_index=True).compute()
-        # ddf_chunk = dd.from_pandas(concatenated_df, npartitions=1)
-        # # ddf_chunk = dd.from_pandas(pd.concat(current_chunk, axis=0, ignore_index=True), npartitions=1)
-        # concatenated_chunks.append(ddf_chunk)
-        logger.info("get_wobble_data: ddf_chunk %d concatenated (LAST)", len(concatenated_chunks))
+    if chunks_lvl_I:
+        concatenated_df_lvl_1 = pd.concat(chunks_lvl_I, axis=0, ignore_index=True)
+        chunks_lvl_II.append(concatenated_df_lvl_1)
+        chunks_lvl_I = []
+        logger.info("get_wobble_data: %d chunks concatenated (LAST)", len(chunks_lvl_II))
 
-    return dd.concat(concatenated_chunks).astype(reduced_stat_ddf_scheme)
-    # return dd.concat(concatenated_chunks).astype(stat_ddf_schema)
+    turn_off_dask()
+    # return dd.concat(concatenated_chunks).astype(reduced_stat_ddf_scheme)
+    return pd.concat(chunks_lvl_II).astype(reduced_stat_ddf_scheme)
 
 if __name__ == "__main__":
     pass

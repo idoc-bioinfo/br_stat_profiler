@@ -65,7 +65,7 @@ class UARGS:
     LOG_FILE                    =   "log_file"
     EXTRACT_READ_GROUP          =   "extract_read_group"
     DEBUG_SAVE_INTERMEDIATE     =   "save_intermediate"
-    MULTIPLE_CSV_OUTPUT         =   "multiple_csv_output"
+    # MULTIPLE_CSV_OUTPUT         =   "multiple_csv_output"
     WORKERS_NUM                 =   "workers_num"
     MEMORY_LIMIT                =   "memory_limit"
 
@@ -263,14 +263,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
         ArgPropKey.ACTION:      'store_true',
     },
-    UARGS.MULTIPLE_CSV_OUTPUT: {
-        ArgPropKey.DEFAULT:     False,
-        ArgPropKey.TYPE:        None,
-        ArgPropKey.HELP:        'Save ouptut table in multiple csv files',
-        ArgPropKey.SHORT_FLAG:  '-mCSV',
-        ArgPropKey.LONG_FLAG:   '--' + UARGS.MULTIPLE_CSV_OUTPUT,
-        ArgPropKey.ACTION:      'store_true',
-    },
+    # UARGS.MULTIPLE_CSV_OUTPUT: {
+    #     ArgPropKey.DEFAULT:     False,
+    #     ArgPropKey.TYPE:        None,
+    #     ArgPropKey.HELP:        'Save ouptut table in multiple csv files',
+    #     ArgPropKey.SHORT_FLAG:  '-mCSV',
+    #     ArgPropKey.LONG_FLAG:   '--' + UARGS.MULTIPLE_CSV_OUTPUT,
+    #     ArgPropKey.ACTION:      'store_true',
+    # },
     UARGS.DEBUG_SAVE_INTERMEDIATE: {
         ArgPropKey.DEFAULT:     False,
         ArgPropKey.TYPE:        None,

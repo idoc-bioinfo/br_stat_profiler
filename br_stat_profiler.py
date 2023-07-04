@@ -6,8 +6,10 @@ import io
 import os
 import sys
 import pandas as pd
-import dask.dataframe as dd
-from dask import delayed
+
+# import dask.dataframe as dd
+from sklearn.preprocessing import StandardScaler
+
 
 import numpy as np
 # from sklearn.preprocessing import StandardScaler
@@ -19,11 +21,11 @@ from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT \
 
 # from usr_props import UserProperties
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
-# from wobble_utils import WobbleUtil, get_wobble_data, ddf_get_wobble_data
-from wobble_utils import WobbleUtil, ddf_get_wobble_data
+from wobble_utils import WobbleUtil, get_wobble_data
 from log_utils import logger
-LOG_HARVEST_ROW_COUNT = 50000
 
+
+LOG_HARVEST_ROW_COUNT = 50000
 
 def create_dtype_dict(formats_list):
     """ Generate dictionary to convert printing types format ("%s, %d") into python dtypes
@@ -243,34 +245,35 @@ def add_cyc_bins(cyc_rt2_df, cyc_range_abs, args_dict):
 
     return cyc_rt2_df
 
-def ddf_get_missing_values(stat_ddf, full_cov_collection, cov_type):
+
+def get_missing_values(stat_df, full_cov_collection, cov_type):
     """Adds to a stat_df all the missing covariates from the FULL covariates
     colleciton with None values of the statisics
     Args:
-        stat_df (dd.Dataframe): statistics table
+        stat_df (pd.Dataframe): statistics table
         full_cov_collection (list): full covariates spaces
 
     Returns:
         pd.Dataframe: stat_df with additional rows for the missing covariates (None value)
     """
-    # cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]
     logger.info("completing missing kmers/cyc: cov_type=%s", cov_type)
-    def subtract_set(x):
-        return list(set(full_cov_collection) - set(x))
 
-    # Generate ddf with the complement set of the existing covariate set
-    missing_ddf = stat_ddf.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[cov_type] \
-        .apply(delayed(subtract_set), meta=(cov_type, 'object'))\
-            .reset_index().persist().compute().explode(cov_type)\
+    # Generate df with the complement set of the existing covariate set
+    missing_df = stat_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[cov_type] \
+        .apply(lambda x: list(set(full_cov_collection) - set(x))) \
+            .reset_index().explode(cov_type) \
                 .dropna(subset=[cov_type])
 
+    logger.info("missing_ddf: %s", type(missing_df))
     # Substitute "None" in the statistics cols (located right to the cov_type column)
-    right_cols = stat_ddf.columns[stat_ddf.columns.get_loc(cov_type)+1:]
-    missing_ddf.loc[:, right_cols] = None
-    logger.info("missing k_mers/cyc completed!!")
-    return missing_ddf
+    right_cols = stat_df.columns[stat_df.columns.get_loc(cov_type)+1:]
+    missing_df.loc[:, right_cols] = None
 
-def ddf_add_id_column(stat_ddf):
+    logger.info("missing k_mers/cyc completed!!")
+    return missing_df
+
+
+def add_id_column(stat_df):
     """Addition of column with unique ID per ReadGroup
     The IDs will be used for an index in the final profile.
 
@@ -282,56 +285,52 @@ def ddf_add_id_column(stat_ddf):
         pd.Dataframe: statistics table with addtional columns with IDS
     """
     logger.info("adding id column")
-    cov_type = stat_ddf.columns[RT2_STAT.COV_TYPE_COL_IDX]  # covariate type
+    cov_type = stat_df.columns[RT2_STAT.COV_TYPE_COL_IDX]  # covariate type
     suffix = cov_type
-    def generate_id(row, suffix):
-        return RT2_STAT.ID_DELIM.join(list(row) + [suffix])
-
     # adding coloumn_id by joining together data from two different columns + suffix
-    stat_ddf[RT2_STAT.ID_COL] = stat_ddf[[cov_type, RC_TAB2.RG_SCORE_BIN_COL]].astype(str)\
-        .apply(generate_id, args=(suffix,), axis=1, meta=(RT2_STAT.ID_COL, 'object'))
+    stat_df[RT2_STAT.ID_COL] = stat_df[[cov_type, RC_TAB2.RG_SCORE_BIN_COL]].astype(str) \
+        .apply(lambda x:  RT2_STAT.ID_DELIM.join(list(x) + [suffix]), axis=1)
+
     logger.info("id column added!!")
-    return stat_ddf
+    return stat_df
 
-def _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict):
 
-    rt2_stat_ddf = dd.from_pandas(pd.DataFrame(), npartitions=1)
+def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
+
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
         only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
-        wob_data_ddf = ddf_get_wobble_data(rt2_stat_df, only_wobbled_k_mers)
-        rt2_stat_ddf = dd.from_pandas(rt2_stat_df[REDUCED_STAT_DF_COLS], npartitions=1)
-        # rt2_stat_ddf = dd.from_pandas(rt2_stat_df, npartitions=1)
-        # rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(stat_ddf_schema)
-        rt2_stat_ddf = dd.concat([rt2_stat_ddf, wob_data_ddf]).astype(reduced_stat_ddf_scheme)
-    else: # cov_type == RC_TAB2.CYC_COV or NO_WOBBLE
-        rt2_stat_ddf = dd.from_pandas(rt2_stat_df[REDUCED_STAT_DF_COLS], npartitions=1)
 
-    # print("#1\n",rt2_stat_ddf.head())
+        # turn_on_dask(args_dict)
+        wob_data_df = get_wobble_data(rt2_stat_df, only_wobbled_k_mers, args_dict)
+        # turn_off_dask()
+
+        rt2_stat_df = pd.concat([rt2_stat_df, wob_data_df]).astype(reduced_stat_ddf_scheme)
+
+    rt2_stat_df = rt2_stat_df[REDUCED_STAT_DF_COLS]
+
+    # old feature, consider depracation since it is not recommended to change the profile
     if args_dict[UARGS.QERR_SYM_CUTOFF]:
-        rt2_stat_ddf = rt2_stat_ddf[abs(rt2_stat_ddf[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >= args_dict[UARGS.QERR_CUTOFF]]
+        rt2_stat_df = rt2_stat_df[abs(rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL]) >= args_dict[UARGS.QERR_CUTOFF]]
     else:
-        rt2_stat_ddf = rt2_stat_ddf[rt2_stat_ddf[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
+        rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
 
     # DEBUG : saving intermediate file for the case of later memory crash
     if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
         output_csv_file = f'{uuid.uuid4()}.csv'
-        logger.info("_prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-        logger.info("prepare_stat_ddf: intermediate file columns \n %s", rt2_stat_ddf.columns)
-        single_f = not bool(args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
-        rt2_stat_ddf.to_csv(output_csv_file, single_file=single_f)
-        logger.info("_prepare_stat_ddf: intermediate file Saved")
+        logger.info("_prepare_stat_df: saving intermediate file %s", output_csv_file)
+        rt2_stat_df.to_csv(output_csv_file)
+        logger.info("_prepare_stat_df: intermediate file Saved")
 
-    # missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library)
-    missing_ddf = ddf_get_missing_values(rt2_stat_ddf, full_library, cov_type)
-    if len(missing_ddf.index) != 0:
-        # rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(stat_ddf_schema)
-        rt2_stat_ddf = dd.concat([rt2_stat_ddf, missing_ddf]).astype(reduced_stat_ddf_scheme)
-    rt2_stat_ddf = ddf_add_id_column(rt2_stat_ddf)
-    logger.debug(rt2_stat_ddf.columns)
-    logger.debug("_prepare_stat_ddf: Dask partitions number: %d", rt2_stat_ddf.npartitions)
-    return rt2_stat_ddf
+    missing_df = get_missing_values(rt2_stat_df, full_library, cov_type)
+    if len(missing_df.index) != 0:
+        rt2_stat_df = pd.concat([rt2_stat_df, missing_df]).astype(reduced_stat_ddf_scheme)
 
-def prepare_stat_ddf(rt2_df, cov_type, args_dict):
+    rt2_stat_df = add_id_column(rt2_stat_df)
+
+    logger.debug("_prepare_stat_df: end !!")
+    return rt2_stat_df
+
+def prepare_stat_df(rt2_df, cov_type, args_dict):
     """Preparation a statistics table before profile extraction
 
     Args:
@@ -350,7 +349,7 @@ def prepare_stat_ddf(rt2_df, cov_type, args_dict):
     mode_rt2_df = rt2_df[rt2_df[RC_TAB2.COV_NAME_COL] == cov_type]\
         .rename(columns={RC_TAB2.COV_VAL_COL: cov_type})
 
-    # Extract the readgroup string from format C5BCAACXX:1:none
+    # Extract the readgroup string from format C5BCAACXX:1:none (when the paired reading_groups)
     if args_dict[UARGS.EXTRACT_READ_GROUP]:
         mode_rt2_df[RC_TAB2.RG_COL] = mode_rt2_df[RC_TAB2.RG_COL].apply(
             lambda x: x.split(':')[0])
@@ -372,11 +371,10 @@ def prepare_stat_ddf(rt2_df, cov_type, args_dict):
     elif cov_type == RC_TAB2.CNTXT_COV:  # context statistics
         if args_dict[UARGS.NO_WOBBLE]:
             # generate of full k_mers list without woobles position
-            combinations = list(itertools.product(
-                ['A', 'C', 'G', 'T'], repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
+            combinations = list(itertools.product(['A', 'C', 'G', 'T'],
+                                                  repeat=args_dict[PRVT_ARG.MM_CNTXT_SIZE]))
             full_library = [''.join(comb) for comb in combinations]
-        else:  # with woble
-            # full_library = get_wobbled_k_mers(args_dict[PRVT_ARG.MM_CNTXT_SIZE], args_dict, only_with_wob=False)
+        else:  # with Wobbles !!!
             full_library = WobbleUtil.get_full_wobbled_k_mers_list(args_dict[PRVT_ARG.MM_CNTXT_SIZE],
                                                          args_dict[UARGS.MAX_WOB_N_OCC],
                                                          args_dict[UARGS.MAX_WOB_R_Y_OCC],
@@ -385,22 +383,17 @@ def prepare_stat_ddf(rt2_df, cov_type, args_dict):
 
     # # calculate statistics without wooble
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
+    rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
 
-    # rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
-    rt2_stat_ddf = _prepare_stat_ddf(rt2_stat_df, full_library, cov_type, args_dict)
-    logger.info("prepare_stat_ddf finished")
-    rt2_stat_ddf = rt2_stat_ddf.persist()
     # DEBUG : saving intermediate file for the case of later memory crash
     if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
         output_csv_file = f'{uuid.uuid4()}.csv'
         logger.info("prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-        logger.info("prepare_stat_ddf: intermediate file columns \n %s", rt2_stat_ddf.columns)
-        single_f = not bool(args_dict[UARGS.MULTIPLE_CSV_OUTPUT])
-        rt2_stat_ddf.to_csv(output_csv_file, single_file=single_f)
-        # rt2_stat_ddf.to_csv(output_csv_file, single_file=False)
-        logger.info("prepare_stat_ddf: intermediate file Saved")
+        logger.info("prepare_stat_df: intermediate file columns \n %s", rt2_stat_df.columns)
+        rt2_stat_df.to_csv(output_csv_file)
+        logger.info("prepare_stat_df: intermediate file Saved")
 
-    return rt2_stat_ddf
+    return rt2_stat_df
 
 def preprocess_GATK_report(args_dict):
     """preprocess GATKReport:
@@ -425,7 +418,8 @@ def preprocess_GATK_report(args_dict):
     # recal table 2 pre-proocessing
     return filter_and_binning_rc_tab2_df(rt2_df, args_dict)  # add ScoreBin to RecalTable2
 
-def ddf_extract_profile(stat_ddf, args_dict):
+
+def df_extract_profile(stat_df, args_dict):
     """Extracts profiles form the stat table.
     Optionally the profile is ZSCORED (by --zscore flag)
 
@@ -437,38 +431,30 @@ def ddf_extract_profile(stat_ddf, args_dict):
         pd.Dataframe: zscored profile
     """
     logger.debug("Extracting profile start")
-    # stat_df = stat_df.categorize(columns=[RC_TAB2.RG_COL,RT2_STAT.ID_COL])
-    stat_ddf = stat_ddf.sort_values(by=RT2_STAT.ID_COL)
+
+    stat_df = stat_df.sort_values(by=RT2_STAT.ID_COL)
     logger.debug("Extracting profile: profile sorted !!")
-    stat_ddf = stat_ddf.categorize(columns=[RC_TAB2.RG_COL,RT2_STAT.ID_COL])
-    stat_ddf = stat_ddf.persist() # to reduce the calculation graph
-    logger.debug("Extracting profile: categorized !!")
-    q_err_profile_ddf = stat_ddf.pivot_table(columns=RC_TAB2.RG_COL,
+
+    q_err_profile_df = stat_df.pivot_table(columns=RC_TAB2.RG_COL,
                                                 values=RT2_STAT.BIN_AVG_QLTY_ERR_COL,
                                                 index = RT2_STAT.ID_COL)
+    logger.debug("pivot_table preformed !!")
 
-
-    logger.debug("pivot_table: Dask partitions number: %d", q_err_profile_ddf.npartitions)
-    # zscoring if requested
+    # Zscoring if required - (concider depracation since I recommend that It would be preformed in a later stage)
     if args_dict[UARGS.ZSCORING]:
-        colnames = q_err_profile_ddf.columns.tolist()
-        for col in colnames:
-            mean = q_err_profile_ddf[col].mean()
-            std = q_err_profile_ddf[col].std()
-            def calculate_zscore(x, avg, sd):
-                return (x - avg) / sd
-            q_err_profile_ddf[col] = q_err_profile_ddf[col].map_partitions(calculate_zscore, avg=mean, sd=std)
+        scaler = StandardScaler()
+        q_err_profile_df = pd.DataFrame(scaler.fit_transform(q_err_profile_df),
+                                     columns=q_err_profile_df.columns, index=q_err_profile_df.index)
 
     # Substitute a filler char to instead of 'None' if requested
-    if args_dict[UARGS.NAN_REP] is not None:  # nan_rep == 0 by default
-        colnames = q_err_profile_ddf.columns.tolist()
-        for col in colnames:
-            q_err_profile_ddf[col] = q_err_profile_ddf[col].fillna(args_dict[UARGS.NAN_REP])
+    if args_dict[UARGS.NAN_REP] != None:  # nan_rep == 0 by default
+        q_err_profile_df = q_err_profile_df.fillna(args_dict[UARGS.NAN_REP])
 
-    return q_err_profile_ddf
+    return q_err_profile_df
 
 
-def _ddf_profile_rt(pre_stat_df, args_dict):
+
+def _df_profile_rt(pre_stat_df, args_dict):
     """
     Extracts profiles form the stat table.
     The exracted profiles are optionally zscored
@@ -485,52 +471,57 @@ def _ddf_profile_rt(pre_stat_df, args_dict):
         pd.Dataframe: final profile
     """
     if args_dict[UARGS.COV_TYPE] == "cntxt" or args_dict[UARGS.COV_TYPE] == "cntxt_cyc":
-        cntxt_rt2_stat_ddf = prepare_stat_ddf(
+        cntxt_rt2_stat_df = prepare_stat_df(
             pre_stat_df, RC_TAB2.CNTXT_COV, args_dict)
-        cntxt_profile_ddf = ddf_extract_profile(cntxt_rt2_stat_ddf, args_dict)
+        cntxt_profile_df = df_extract_profile(cntxt_rt2_stat_df, args_dict)
 
     if args_dict[UARGS.COV_TYPE] == "cntxt":
-        return cntxt_profile_ddf
+        return cntxt_profile_df
 
     if args_dict[UARGS.COV_TYPE] == "cyc" or args_dict[UARGS.COV_TYPE] == "cntxt_cyc":
-        cyc_rt2_stat_ddf = prepare_stat_ddf(
+        cyc_rt2_stat_df = prepare_stat_df(
             pre_stat_df, RC_TAB2.CYC_COV, args_dict)
-        cyc_profile_ddf = ddf_extract_profile(cyc_rt2_stat_ddf, args_dict)
+        cyc_profile_df = df_extract_profile(cyc_rt2_stat_df, args_dict)
 
     if args_dict[UARGS.COV_TYPE] == "cyc":
-        return cyc_profile_ddf
+        return cyc_profile_df
     # args_dict[UARGS.COV_TYPE] == "cntxt_cyc"
-    return dd.concat([cntxt_profile_ddf, cyc_profile_ddf])
+    return pd.concat([cntxt_profile_df, cyc_profile_df])
 
-def ddf_profile_rt(pre_stat_df, args_dict):
+
+
+def df_profile_rt(pre_stat_df, args_dict):
     """
     added for logging purposes
     """
-    ready_profile_ddf = _ddf_profile_rt(pre_stat_df, args_dict)
+    ready_profile_ddf = _df_profile_rt(pre_stat_df, args_dict)
     logger.info("ddf_profile_rt processing finished!!!")
     return ready_profile_ddf
-
 
 if __name__ == "__main__":
     parser = load_parser()
     # testing  code
     # ################### TESTING ############################
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
-    # # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
+    # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
     # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
-    # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -lg log1.txt " # -nW -ct cyc" # -o test.csv"
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 8 -mL 8GB -mCSV -sI" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
+    # OUTFILE = "test.csv"
+    # if os.path.exists(OUTFILE):
+    #     os.remove(OUTFILE)
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug -cN 8 -mL 16GB" #  -ct cyc" #  -lg log1.txt "
+    # # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -nW -V debug" #  -ct cyc" #  -lg log1.txt "
+    # # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 8 -mL 8GB -mCSV -sI" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
     # # # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
     # # # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
     # # # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
     # # # # #             --no_wobble -V debug -cN 10 -mL 20GB"
-    # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
-    #     --scr_bin_count 3 --min_score 20 --extract_read_group \
-    #     --max_wob_N_occ 0 --max_wob_R_Y_occ 0 --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
-    #     --no_wobble"
+    # # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
+    # #     --scr_bin_count 3 --min_score 20 --extract_read_group \
+    # #     --max_wob_N_occ 0 --max_wob_R_Y_occ 0 --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
+    # #     --no_wobble"
     # args = parser.parse_args(cmd.split())
     ################## PRODUCTTION ############################
     args = parser.parse_args()
@@ -538,35 +529,23 @@ if __name__ == "__main__":
     adict = check_args(args)
     logger.info("Command Line:\n %s", ' '.join(sys.argv))
     # Setting up Dask cluter
-    logger.info("setting up dask cluter")
-    os.environ['MALLOC_TRIM_THRESHOLD_'] = "32178"
-    from dask.distributed import Client, LocalCluster
-    cluster = LocalCluster(n_workers=adict[UARGS.WORKERS_NUM],
-                           threads_per_worker=4, memory_limit=adict[UARGS.MEMORY_LIMIT])
-    client = Client(cluster)
-    logger.info("dask dashbord url: %s", client.dashboard_link)
-    # Profile processing
+
     logger.info("Start profile preprocessing....")
     rt2_pre_stat_df = preprocess_GATK_report(adict)
     logger.info("Profile preprocessed!!")
     logger.info("Starting profile preparation")
-    ddf_profile = ddf_profile_rt(rt2_pre_stat_df, adict)
+    df_profile = df_profile_rt(rt2_pre_stat_df, adict)
     logger.info("Profile prepared")
 
     # save profile to file/ stdout
     if type(adict[UARGS.OUTFILE]) is io.TextIOWrapper: # stdout
-        print(ddf_profile.compute().to_string(), file=adict[UARGS.OUTFILE])
+        # print(ddf_profile.compute().to_string(), file=adict[UARGS.OUTFILE])
+        print(df_profile.to_string(), file=adict[UARGS.OUTFILE])
     else: # filename
         logger.info("Profile saving to %s...", adict[UARGS.OUTFILE])
-        logger.info("Dask # of partitions : %d", ddf_profile.npartitions)
-        single_f = not bool(adict[UARGS.MULTIPLE_CSV_OUTPUT])
-        ddf_profile.to_csv(adict[UARGS.OUTFILE], compute=True, single_file=single_f)
-        ddf_profile.to_csv(adict[UARGS.OUTFILE], single_file=single_f)
+        df_profile.to_csv(adict[UARGS.OUTFILE])
         logger.info("Profile saved - END")
-    # print(ddf_profile.head())
-    # Shutting down the Dask client
-    client.close()
-    cluster.close()
+
     # ################### TESTING ############################
     # print(ddf_profile.head())
     # print(profile.head())
