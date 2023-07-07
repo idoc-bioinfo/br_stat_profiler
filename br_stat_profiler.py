@@ -6,20 +6,13 @@ import io
 import os
 import sys
 import pandas as pd
-
-# import dask.dataframe as dd
 from sklearn.preprocessing import StandardScaler
-
-
 import numpy as np
-# from sklearn.preprocessing import StandardScaler
 
+# pylint: disable=no-member
 # usr-defined dependencies
 from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT \
     ,REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
-# pylint: disable=no-member
-
-# from usr_props import UserProperties
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
 from wobble_utils import WobbleUtil, get_wobble_data
 from log_utils import logger
@@ -301,6 +294,7 @@ def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
         only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
 
         # turn_on_dask(args_dict)
+
         wob_data_df = get_wobble_data(rt2_stat_df, only_wobbled_k_mers, args_dict)
         # turn_off_dask()
 
@@ -509,15 +503,8 @@ if __name__ == "__main__":
     # OUTFILE = "test.csv"
     # if os.path.exists(OUTFILE):
     #     os.remove(OUTFILE)
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug -cN 8 -mL 16GB" #  -ct cyc" #  -lg log1.txt "
-    # # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -nW -V debug" #  -ct cyc" #  -lg log1.txt "
-    # # cmd = f"--infile {REC_TAB_FULL_PATH} -o test.csv -V debug -cN 8 -mL 8GB -mCSV -sI" # -mCSV -sI  -nW -ct cyc" # -o test.csv"
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug" #-cN 2 -mL 16GB" #  -ct cyc" #  -lg log1.txt "
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
-    # # # # # cmd = f"--infile {REC_TAB_FULL_PATH} -mCSV -V debug -o test2.csv \
-    # # # # #     --scr_bin_count 3 --min_score 20  --extract_read_group \
-    # # # # #             --max_wob_N_occ 0 --max_wob_R_Y_occ 0 \
-    # # # # #             --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \
-    # # # # #             --no_wobble -V debug -cN 10 -mL 20GB"
     # # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
     # #     --scr_bin_count 3 --min_score 20 --extract_read_group \
     # #     --max_wob_N_occ 0 --max_wob_R_Y_occ 0 --max_wob_B_D_H_V_occ 0 --max_wob_M_S_W_occ 0 \

@@ -4,7 +4,7 @@ import math
 import os
 import numpy as np
 import pandas as pd
-import dask
+
 from dask import delayed
 from dask.distributed import Client, LocalCluster
 
@@ -32,23 +32,12 @@ class WobbleUtil:
         'H':    '[ACT]',
         'V':    '[ACG]',
     }
+
+    trans_table = str.maketrans(patterns_dict)
+
     @staticmethod
-    def match_k_mer(wobbled_k_mer, k_mer):
-        """Check if k-mer matches wobbled k_mer
-        Args:
-            wobbled_k_mer (str): wobbled_k_mer
-            k_mer (str): _description_
-
-        Returns:
-            bool: matched / unmated
-        """
-        wob_regex = wobbled_k_mer
-        # wobbled_k_mer => regex pattern
-        for wob_base in WobbleUtil.patterns_dict:
-            wob_regex = wob_regex.replace(wob_base, WobbleUtil.patterns_dict[wob_base])
-
-        pattern = rf'^{wob_regex}$'
-        return bool(re.match(pattern, k_mer))
+    def wobble_k_mer_to_regexp(wobbled_k_mer):
+        return rf'^{wobbled_k_mer.translate(WobbleUtil.trans_table)}$'
 
     @staticmethod
     def has_any(tested_str: str):
@@ -122,7 +111,6 @@ class WobbleUtil:
         return non_wobled_k_mers
 
 
-# @dask.delayed
 def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2.CNTXT_COV):
     """
     Calculates a single wobbled k_mer data out of the non wobbled positions
@@ -161,8 +149,6 @@ def calculate_wobble_stat_new(specific_wob_df, wobbled_k_mer, cov_type = RC_TAB2
 
     return wob_score_df[REDUCED_STAT_DF_COLS]
 
-
-
 def turn_on_dask(adict):
     logger.info("setting up dask cluter")
     global dask_cluster
@@ -179,17 +165,28 @@ def turn_off_dask():
     dask_cluster.close()
     logger.info("dask cluter is turned off")
 
-@dask.delayed
+@delayed
 def _calculate_wobble_stat_new(stat_df, wobbled_k_mer):
-        # extract the rows with k-mers that matches the wob_k_mer of interest
+
+    # extract the rows with k-mers that matches the wob_k_mer of interest
+    wob_reg_exp = WobbleUtil.wobble_k_mer_to_regexp(wobbled_k_mer)
     wob_df = stat_df[stat_df[RC_TAB2.CNTXT_COV].\
-        apply(lambda x, w_k_mer=wobbled_k_mer: WobbleUtil.match_k_mer(wobbled_k_mer, x))]
+        apply(lambda x, w_regexp=wob_reg_exp: bool(re.match(w_regexp, x)))]
 
     if wob_df.empty: # no rows with wob_k_mer matching
         return wob_df[REDUCED_STAT_DF_COLS]
 
     # return calculate_wobble_stat_new(wob_df, wobbled_k_mer)
     return calculate_wobble_stat_new(wob_df.copy(), wobbled_k_mer)
+
+
+
+# ##############################
+# import cProfile
+# # Create a cProfile object
+# profiler = cProfile.Profile()
+# ##############################
+
 
 def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
     """Calculates statistics for all the wobbled k-mers and concatenate it alltogether
@@ -203,7 +200,8 @@ def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
         pd.Dataframe: combined table with non_wobbled and wobbled data
     """
     logger.info("get_wobble_data: start")
-
+    # Start profiling
+    # profiler.enable()
     wobbled_k_mer_count = len(wobbled_k_mers_list)
     turn_on_dask(args_dict)
 
@@ -252,7 +250,10 @@ def get_wobble_data(stat_df, wobbled_k_mers_list, args_dict):
         logger.info("get_wobble_data: %d chunks concatenated (LAST)", len(chunks_lvl_II))
 
     turn_off_dask()
-    # return dd.concat(concatenated_chunks).astype(reduced_stat_ddf_scheme)
+    # Stop profiling and printout profiling results
+    # profiler.disable()
+    # profiler.print_stats(sort='time')
+
     return pd.concat(chunks_lvl_II).astype(reduced_stat_ddf_scheme)
 
 if __name__ == "__main__":
