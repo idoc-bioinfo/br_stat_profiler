@@ -257,12 +257,11 @@ def get_missing_values(stat_df, full_cov_collection, cov_type):
             .reset_index().explode(cov_type) \
                 .dropna(subset=[cov_type])
 
-    logger.info("missing_ddf: %s", type(missing_df))
     # Substitute "None" in the statistics cols (located right to the cov_type column)
     right_cols = stat_df.columns[stat_df.columns.get_loc(cov_type)+1:]
     missing_df.loc[:, right_cols] = None
 
-    logger.info("missing k_mers/cyc completed!!")
+    logger.info("completed !!! %d missing k_mers/cyc added", missing_df.shape[0])
     return missing_df
 
 
@@ -431,7 +430,7 @@ def df_extract_profile(stat_df, args_dict):
 
     q_err_profile_df = stat_df.pivot_table(columns=RC_TAB2.RG_COL,
                                                 values=RT2_STAT.BIN_AVG_QLTY_ERR_COL,
-                                                index = RT2_STAT.ID_COL)
+                                                index = RT2_STAT.ID_COL, dropna=False)
     logger.debug("pivot_table preformed !!")
 
     # Zscoring if required - (concider depracation since I recommend that It would be preformed in a later stage)
@@ -497,13 +496,14 @@ if __name__ == "__main__":
     # testing  code
     # ################### TESTING ############################
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
-    # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
+    # # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
+    # # RECAL_TABLE_FILE = "HKNPC-101N.bam.GATKReport.mm_cntxt.6"
     # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
     # OUTFILE = "test.csv"
     # if os.path.exists(OUTFILE):
     #     os.remove(OUTFILE)
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug" #-cN 2 -mL 16GB" #  -ct cyc" #  -lg log1.txt "
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug -nW"# -cN  -mL 16GB" #  -ct cyc" #  -lg log1.txt "
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
     # #     --scr_bin_count 3 --min_score 20 --extract_read_group \
