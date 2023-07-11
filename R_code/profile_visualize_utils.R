@@ -1,4 +1,4 @@
-
+library(remotes)
 library(ggplot2)
 
 create_grid_heatmap <- function(grid_df, grid_title, my_font_size=5, inversed_colors=FALSE, limits_0_1 = TRUE ){
@@ -37,25 +37,27 @@ create_grid_heatmap <- function(grid_df, grid_title, my_font_size=5, inversed_co
     return(plot)
 }
 
-show_lines <- function (in_dfs, x_lab, y_lab, legend_position = c(0.85, 0.9), y_range=NULL){
+show_lines <- function (in_dfs, x_lab, y_lab, legend_position = c(0.85, 0.9), y_range=NULL, x_interval=2){
     df_labels = rownames(in_dfs)
     df <- as.data.frame(t(in_dfs))
+    if (is.null(y_range)){
+        y_range=c(min(df),max(df))
+    }
     df['Bins'] <- as.numeric(rownames(df))
     head_title = paste(y_lab, "Vs.", x_lab)
     options(repr.plot.width = 8, repr.plot.height = 8)
-    if (is.null(y_range)){
-        y_range=c(0.5,1)
-    }
-
     min_x <- min(df$Bins)
     max_x <- max(df$Bins)
+    # length_x <- length(df$Bins)
+    # interval_x <- abs(max_x - min_x)/(length_x -1)
+    # x_ticks_interval =round(abs(max_x-min_x)/(length(df['Bins'])-1),0)
     ggplot(data = df, aes(x=Bins)) +
-        geom_line(aes(y=complete, color = "complete")) +
-        geom_point(aes(y=complete, color = "complete")) +
-        geom_line(aes(y=average,  color = "average")) +
-        geom_point(aes(y=average,  color = "average")) +
-        geom_line(aes(y=ward,     color = "ward")) +
-        geom_point(aes(y=ward,     color = "ward")) +
+        geom_line(aes(y=complete, color = "complete"),  size=0.75, alpha = 0.5) +
+        geom_point(aes(y=complete, color = "complete"), size=0.75, alpha = 0.5) +
+        geom_line(aes(y=average,  color = "average"),   size=0.75, alpha = 0.5) +
+        geom_point(aes(y=average,  color = "average"),  size=0.75, alpha = 0.5) +
+        geom_line(aes(y=ward,     color = "ward"),      size=0.75, alpha = 0.5) +
+        geom_point(aes(y=ward,     color = "ward"),     size=0.75, alpha = 0.5) +
         labs(x=x_lab, y=y_lab, color = "Columns") +
         ggtitle(head_title) +
         scale_color_manual(values = c("blue", "red", "green"),
@@ -65,11 +67,12 @@ show_lines <- function (in_dfs, x_lab, y_lab, legend_position = c(0.85, 0.9), y_
         # ylim(0.5, 1) +
         ylim(y_range) +
         theme(
-            axis.text = element_text(size = 12),        # Set font size for axis text
-            axis.title = element_text(size = 14),       # Set font size for axis titles
-            legend.text = element_text(size = 12),      # Set font size for legend text
-            legend.title = element_text(size = 14),     # Set font size for legend title
-            plot.title = element_text(size = 16)        # Set font size for plot title
+            axis.text       = element_text(size = 12),        # Set font size for axis text
+            axis.title      = element_text(size = 14),       # Set font size for axis titles
+            legend.text     = element_text(size = 12),      # Set font size for legend text
+            legend.title    = element_text(size = 14),     # Set font size for legend title
+            plot.title      = element_text(size = 16)        # Set font size for plot title
         ) +
-        scale_x_continuous(breaks = seq(min_x, max_x, by = 2))
+        scale_x_continuous(breaks = seq(min_x, max_x, by = x_interval))
 }
+

@@ -3,7 +3,6 @@ import itertools
 import math
 import uuid
 import io
-import os
 import sys
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -14,7 +13,7 @@ import numpy as np
 from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT \
     ,REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
-from wobble_utils import WobbleUtil, get_wobble_data
+from wobble_utils import WobbleUtil, get_wobble_data_dask, get_wobble_data_polars # ,get_wobble_data
 from log_utils import logger
 
 
@@ -291,15 +290,13 @@ def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
 
     if cov_type == RC_TAB2.CNTXT_COV and not args_dict[UARGS.NO_WOBBLE]:
         only_wobbled_k_mers = WobbleUtil.remove_non_wobble(full_library)
+        # wob_data_df = get_wobble_data_dask(rt2_stat_df, only_wobbled_k_mers, args_dict)
+        wob_data_df = get_wobble_data_polars(rt2_stat_df, only_wobbled_k_mers)
 
-        # turn_on_dask(args_dict)
-
-        wob_data_df = get_wobble_data(rt2_stat_df, only_wobbled_k_mers, args_dict)
-        # turn_off_dask()
-
+        rt2_stat_df = rt2_stat_df[REDUCED_STAT_DF_COLS]
         rt2_stat_df = pd.concat([rt2_stat_df, wob_data_df]).astype(reduced_stat_ddf_scheme)
-
-    rt2_stat_df = rt2_stat_df[REDUCED_STAT_DF_COLS]
+    else:
+        rt2_stat_df = rt2_stat_df[REDUCED_STAT_DF_COLS]
 
     # old feature, consider depracation since it is not recommended to change the profile
     if args_dict[UARGS.QERR_SYM_CUTOFF]:
@@ -307,12 +304,12 @@ def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
     else:
         rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
 
-    # DEBUG : saving intermediate file for the case of later memory crash
-    if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
-        output_csv_file = f'{uuid.uuid4()}.csv'
-        logger.info("_prepare_stat_df: saving intermediate file %s", output_csv_file)
-        rt2_stat_df.to_csv(output_csv_file)
-        logger.info("_prepare_stat_df: intermediate file Saved")
+    # # DEBUG : saving intermediate file for the case of later memory crash
+    # if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
+    #     output_csv_file = f'{uuid.uuid4()}.csv'
+    #     logger.info("_prepare_stat_df: saving intermediate file %s", output_csv_file)
+    #     rt2_stat_df.to_csv(output_csv_file)
+    #     logger.info("_prepare_stat_df: intermediate file Saved")
 
     missing_df = get_missing_values(rt2_stat_df, full_library, cov_type)
     if len(missing_df.index) != 0:
@@ -334,7 +331,6 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
     Returns:
         pd.Dataframe: stat table for profile extraction
     """
-
     full_library = []
     target_colname = cov_type
 
@@ -378,13 +374,13 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
     rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
 
-    # DEBUG : saving intermediate file for the case of later memory crash
-    if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
-        output_csv_file = f'{uuid.uuid4()}.csv'
-        logger.info("prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-        logger.info("prepare_stat_df: intermediate file columns \n %s", rt2_stat_df.columns)
-        rt2_stat_df.to_csv(output_csv_file)
-        logger.info("prepare_stat_df: intermediate file Saved")
+    # # DEBUG : saving intermediate file for the case of later memory crash
+    # if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
+    #     output_csv_file = f'{uuid.uuid4()}.csv'
+    #     logger.info("prepare_stat_ddf: saving intermediate file %s", output_csv_file)
+    #     logger.info("prepare_stat_df: intermediate file columns \n %s", rt2_stat_df.columns)
+    #     rt2_stat_df.to_csv(output_csv_file)
+    #     logger.info("prepare_stat_df: intermediate file Saved")
 
     return rt2_stat_df
 
@@ -496,14 +492,15 @@ if __name__ == "__main__":
     # testing  code
     # ################### TESTING ############################
     # RECAL_TABLE_DIR = "./data/test_bqsr/"
-    # # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
-    # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
+    # RECAL_TABLE_FILE = "pre-LUAD-02_all_chrs_wo_Y_MT.bam.context4.recal_data.table"
+    # # RECAL_TABLE_FILE = "HKNPC-101T.bam.GATKReport.mm_cntxt.6"
     # # RECAL_TABLE_FILE = "HKNPC-101N.bam.GATKReport.mm_cntxt.6"
     # REC_TAB_FULL_PATH = RECAL_TABLE_DIR + RECAL_TABLE_FILE
     # OUTFILE = "test.csv"
+    # import os
     # if os.path.exists(OUTFILE):
     #     os.remove(OUTFILE)
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug -nW"# -cN  -mL 16GB" #  -ct cyc" #  -lg log1.txt "
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug"# -cN  -mL 16GB" #  -ct cyc" #  -lg log1.txt "
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
     # #     --scr_bin_count 3 --min_score 20 --extract_read_group \
@@ -534,8 +531,7 @@ if __name__ == "__main__":
         logger.info("Profile saved - END")
 
     # ################### TESTING ############################
-    # print(ddf_profile.head())
-    # print(profile.head())
+    # print(df_profile.head())
+    # print(df_profile.tail())
     # # print(type(adict[UARGS.OUTFILE]))
-    # # create new dataframe
-    # print(profile.tail())
+

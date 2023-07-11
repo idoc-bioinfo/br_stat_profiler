@@ -1,3 +1,4 @@
+library(remotes)
 library(dplyr)
 
 # profiles_dict are pairs of name  and filename
