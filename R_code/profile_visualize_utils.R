@@ -52,11 +52,11 @@ show_lines <- function (in_dfs, x_lab, y_lab, legend_position = c(0.85, 0.9), y_
     # interval_x <- abs(max_x - min_x)/(length_x -1)
     # x_ticks_interval =round(abs(max_x-min_x)/(length(df['Bins'])-1),0)
     ggplot(data = df, aes(x=Bins)) +
-        geom_line(aes(y=complete, color = "complete"),  size=0.75, alpha = 0.5) +
+        geom_line(aes(y=complete, color = "complete"),  linewidth=0.75, alpha = 0.5) +
         geom_point(aes(y=complete, color = "complete"), size=0.75, alpha = 0.5) +
-        geom_line(aes(y=average,  color = "average"),   size=0.75, alpha = 0.5) +
+        geom_line(aes(y=average,  color = "average"),   linewidth=0.75, alpha = 0.5) +
         geom_point(aes(y=average,  color = "average"),  size=0.75, alpha = 0.5) +
-        geom_line(aes(y=ward,     color = "ward"),      size=0.75, alpha = 0.5) +
+        geom_line(aes(y=ward,     color = "ward"),      linewidth=0.75, alpha = 0.5) +
         geom_point(aes(y=ward,     color = "ward"),     size=0.75, alpha = 0.5) +
         labs(x=x_lab, y=y_lab, color = "Columns") +
         ggtitle(head_title) +
