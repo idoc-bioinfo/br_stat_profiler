@@ -76,3 +76,48 @@ show_lines <- function (in_dfs, x_lab, y_lab, legend_position = c(0.85, 0.9), y_
         scale_x_continuous(breaks = seq(min_x, max_x, by = x_interval))
 }
 
+library(VennDiagram)
+library(png)
+
+library(RColorBrewer)
+show_venn <- function(lst_of_lst, sets_names, file_name, title=""){
+    myCol <- brewer.pal(3, "Pastel2")
+    # Chart
+    venn.diagram(
+            main=title,
+            x = lst_of_lst,
+            category.names = sets_names,
+            filename = file_name,
+            output=TRUE,
+
+            # Output features
+            imagetype="png" ,
+            height = 480 ,
+            width = 480 ,
+            resolution = 300,
+            compression = "lzw",
+
+            # Circles
+            lwd = 2,
+            lty = 'blank',
+            fill = myCol,
+
+            # Numbers
+            cex = .6,
+            fontface = "bold",
+            fontfamily = "sans",
+
+            # Set names
+            cat.cex = 0.6,
+            cat.fontface = "bold",
+            cat.default.pos = "outer",
+            cat.pos = c(-27, 27, 135),
+            cat.dist = c(0.055, 0.055, 0.085),
+            cat.fontfamily = "sans",
+            rotation = 1
+    )
+    options(rpr.plot.height=10, repr.plot.width=10)
+    pp <- readPNG(file_name)
+    plot.new()
+    rasterImage(pp,0 ,0 ,1 ,1)
+}

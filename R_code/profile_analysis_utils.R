@@ -4,12 +4,12 @@ library(dplyr)
 # profiles_dict are pairs of name  and filename
 # the profiles in filenames will be loaded into new variables by the names(files_dict)
 read_profiles_and_assign_vars <- function (profiles_dict, dir_name){
-    keys<- names(files_dict)
-    files<- files_dict
+    keys<- names(profiles_dict)
+    files<- profiles_dict
     for (i in 1:length(keys)) {
-        full_path_profile <- file.path(profiles_dir, files[i])
+        full_path_profile <- file.path(dir_name, files[i])
         profile <- read.csv(full_path_profile, na.strings = "", row.names = 1)
-        assign(keys[i],   profile, envir = .GlobalEnv)
+        assign(keys[i], profile, envir = .GlobalEnv)
     }
 }
 
@@ -19,7 +19,9 @@ invisible(capture.output({
     library(dplyr)
 }))
 cutoff_complete_cases <- function(cutoff,profile_df) {
-    profile_df[abs(profile_df) < cutoff] <- NA
+    profile_df[abs(profile_df) < cutoff] <- NA # symetrical cutoff
+    # profile_df[profile_df >= -cutoff] <- NA   # negative cutoff
+    # profile_df[profile_df <= cutoff] <- NA   # positive cutoff
     data.frame(profile_df[complete.cases(profile_df), ])
 }
 
@@ -110,7 +112,7 @@ get_function_grid <- function(top_sds, cutoffs, m_df, m_func, m_method = NULL) {
 }
 
 
-######################## FOR CLASSIFICATION EVAL ######################################33
+######################## FOR CLASSIFICATION EVALUATION ######################################33
 get_top_sds_list <- function(sds_count_list, df) {
     sds <- rowSds(as.matrix(df), na.rm = TRUE)
     o <- order(sds, decreasing = TRUE)
@@ -129,8 +131,8 @@ get_top_sds_list <- function(sds_count_list, df) {
     return (results)
 }
 
-
-
+# input: a list of dataframes, a function and configurations (count of rows with top SDs, cutoff)
+# return lists of average of function result that was preformed over the each dataframe for all the configurations
 avg_func_res_per_df_new <- function(dfs_list, m_top_sds, names,  m_func, m_method, m_cutoff){
     result_vector = sapply(dfs_list, function (x, method= m_method, top_sds=m_top_sds, cutoff=m_cutoff, my_func=m_func) {
         pci_list <-  cutoff_and_top_sds_list_exec_func(top_sds, cutoff, x, my_func, method)
@@ -356,7 +358,7 @@ get_silhouette_grid <- function(top_sds, cutoffs, df) {
 }
 
 ############################################ T-test ############################################################
-
+TTEST_COL = "T-Test"
 add_t_test <- function(df){
     tumor_cols <- colnames(df)[grep("T\\.bam$", colnames(df))]
     normal_cols <- colnames(df)[grep("N\\.bam$", colnames(df))]
@@ -366,7 +368,7 @@ add_t_test <- function(df){
     ttest_result$p.value
     })
     t_test_df = data.frame(df)
-    t_test_df["T-Test"] = p_values
+    t_test_df[TTEST_COL] = p_values
     return(t_test_df)
 }
 
@@ -374,7 +376,7 @@ add_t_test <- function(df){
 get_avg_ttest_profile <- function(cutoff, profile_df) {
     t_test_df <- data.frame()
     t_test_df <- add_t_test(cutoff_scale_complete_cases(cutoff, profile_df))
-    round(mean(t_test_df[,"T-Test"]),2)
+    round(mean(t_test_df[,TTEST_COL]),2)
 }
 
 
@@ -386,7 +388,7 @@ cutoff_and_top_sds_get_avg_ttest <- function(sds_count, cutoff, profile_df) {
     }
     t_test_df <- data.frame()
     t_test_df <- add_t_test(cleaned_scaled_prf)
-    round(mean(t_test_df[,"T-Test"]),2)
+    round(mean(t_test_df[,TTEST_COL]),2)
 }
 
 get_avg_ttest_grid_old <- function(top_sds, cutoffs, df) {
@@ -398,5 +400,65 @@ get_avg_ttest_grid <- function(top_sds, cutoffs, df) {
         return(get_function_grid(top_sds, cutoffs, df, get_avg_ttest_profile))
 }
 
-################################################################################################33
+###############################  Classifiers #########################################################33
+
+get_ID_of_top_sds <- function(df, top_sds_list, cutoff){
+    prf_cutoffed_df <- cutoff_scale_complete_cases(cutoff, df)
+    cleaned_scaled_prf_lst <- get_top_sds_list(top_sds_list, prf_cutoffed_df)
+    classifiers_lst <- list()
+    for (i in 1:length(top_sds_list)){
+        classifiers_lst <- append(classifiers_lst, list(rownames(cleaned_scaled_prf_lst[[i]])))
+        names(classifiers_lst)[i] <- as.character(top_sds_list[i])
+    }
+    classifiers_lst
+}
+
+
+get_sub_df_below_max_pval <- function(df, rownames_lst, max_pval, descending_order_by_pval=TRUE) {
+    sub_df <- df[rownames(df) %in% rownames_lst,]
+    sub_df_ttest <- add_t_test(sub_df)
+    sub_df_ttest_below_min <- sub_df_ttest[sub_df_ttest[TTEST_COL] <= max_pval, ]
+    if (descending_order_by_pval) {
+        sub_df_ttest_below_min <- sub_df_ttest_below_min %>% arrange(TTEST_COL)
+        # sub_df_ttest_below_min[order(sub_df_ttest_below_min[TTEST_COL]),]
+    }
+    sub_df_ttest_below_min
+}
+
+cutoff_with_ttest_pval <- function(df, cls_list, top_sds, max_ttest_pval){
+    new_cls_list <- list()
+    for (i in 1:length(top_sds)) {
+        key <- as.character(top_sds[i])
+        rownames_lst <- cls_list[[key]]
+        below_min_pval_df <- get_sub_df_below_max_pval(df, rownames_lst, max_ttest_pval)
+        new_cls_list[key] <- list(rownames(below_min_pval_df))
+    }
+        # print(dim(below_min_pval_df)[1]/length(rownames_lst))
+    new_cls_list
+}
+
+get_first_token <- function(x) {
+  tokens <- strsplit(x, ":")[[1]]
+  # print(tokens)
+  tokens[1]
+}
+
+double_list_sapply<-function(dbl_list,method){
+    sapply(dbl_list,function(x,method=get_first_token){
+      temp_lst <- sapply(x, method)
+      unlist(unname(temp_lst))
+    })
+}
+
+
+library(msa)
+library(Biostrings)
+
+
+get_consensus_kmers_lst <- function(kmers_lst){
+    kmer_sequences <- DNAStringSet(kmers_lst)
+    alignment <- msa(kmer_sequences, type = "dna")
+    msaConsensusSequence(alignment)
+}
+
 
