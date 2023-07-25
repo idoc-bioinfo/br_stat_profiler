@@ -238,9 +238,10 @@ get_PCI <- function(profile_df, method="complete") {
     # tumor_indices <- grep("T\\.bam$", names(cluster_labels))
 
     concordant_pairs <- sum(cluster_labels[tumor_samples]  == 2) + sum(cluster_labels[normal_samples]  == 1)
-    discordant_pairs <-  sum(cluster_labels[normal_samples]  == 2) + sum(cluster_labels[tumor_samples]  == 1)
+    discordant_pairs <- sum(cluster_labels[normal_samples]  == 2) + sum(cluster_labels[tumor_samples]  == 1)
     total_pairs <- concordant_pairs + discordant_pairs
-    PCI <- concordant_pairs / total_pairs
+    # PCI <- concordant_pairs / total_pairs
+    PCI <- max(concordant_pairs, discordant_pairs) / total_pairs  # symetrical solution
     round(PCI,2)
 }
 

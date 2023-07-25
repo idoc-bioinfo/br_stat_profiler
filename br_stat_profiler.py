@@ -13,7 +13,7 @@ import numpy as np
 from constants import RT_HDR, ARG_TAB, RC_TAB2, CYC_RT2, RT2_STAT \
     ,REDUCED_STAT_DF_COLS, reduced_stat_ddf_scheme
 from user_args import UARGS, PRVT_ARG, load_parser, check_args
-from wobble_utils import WobbleUtil, get_wobble_data_dask, get_wobble_data_polars # ,get_wobble_data
+from wobble_utils import WobbleUtil, get_wobble_data_polars # ,get_wobble_data_dask
 from log_utils import logger
 
 
@@ -201,6 +201,8 @@ def calculate_stat_rt2_df(item_rt2_df, cov_type):
     stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = \
         stat_df[RT2_STAT.BIN_AVG_EMP_QLTY_COL] - stat_df[RT2_STAT.BIN_AVG_QLTY_SCORE_COL]
 
+
+
     return stat_df
 
 # calculates and add a new column with CYCLES_QUNATILES
@@ -304,12 +306,11 @@ def _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict):
     else:
         rt2_stat_df = rt2_stat_df[rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] >= args_dict[UARGS.QERR_CUTOFF]]
 
-    # # DEBUG : saving intermediate file for the case of later memory crash
-    # if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
-    #     output_csv_file = f'{uuid.uuid4()}.csv'
-    #     logger.info("_prepare_stat_df: saving intermediate file %s", output_csv_file)
-    #     rt2_stat_df.to_csv(output_csv_file)
-    #     logger.info("_prepare_stat_df: intermediate file Saved")
+    if (args_dict[UARGS.REL_FREQ_NORMALIZATION]):
+            rt2_stat_df[RT2_STAT.BIN_OBS_SUM_COL] = \
+                rt2_stat_df.groupby([RC_TAB2.RG_COL, RC_TAB2.RG_SCORE_BIN_COL])[RT2_STAT.BIN_OBS_SUM_COL] \
+                    .transform(lambda x: x / x.sum())
+            rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] = rt2_stat_df[RT2_STAT.BIN_AVG_QLTY_ERR_COL] * rt2_stat_df[RT2_STAT.BIN_OBS_SUM_COL]
 
     missing_df = get_missing_values(rt2_stat_df, full_library, cov_type)
     if len(missing_df.index) != 0:
@@ -374,13 +375,7 @@ def prepare_stat_df(rt2_df, cov_type, args_dict):
     rt2_stat_df = calculate_stat_rt2_df(mode_rt2_df, target_colname)
     rt2_stat_df = _prepare_stat_df(rt2_stat_df, full_library, cov_type, args_dict)
 
-    # # DEBUG : saving intermediate file for the case of later memory crash
-    # if args_dict[UARGS.DEBUG_SAVE_INTERMEDIATE]: # for debugging
-    #     output_csv_file = f'{uuid.uuid4()}.csv'
-    #     logger.info("prepare_stat_ddf: saving intermediate file %s", output_csv_file)
-    #     logger.info("prepare_stat_df: intermediate file columns \n %s", rt2_stat_df.columns)
-    #     rt2_stat_df.to_csv(output_csv_file)
-    #     logger.info("prepare_stat_df: intermediate file Saved")
+
 
     return rt2_stat_df
 
@@ -478,7 +473,6 @@ def _df_profile_rt(pre_stat_df, args_dict):
     return pd.concat([cntxt_profile_df, cyc_profile_df])
 
 
-
 def df_profile_rt(pre_stat_df, args_dict):
     """
     added for logging purposes
@@ -500,7 +494,7 @@ if __name__ == "__main__":
     # import os
     # if os.path.exists(OUTFILE):
     #     os.remove(OUTFILE)
-    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug"# -cN  -mL 16GB" #  -ct cyc" #  -lg log1.txt "
+    # cmd = f"--infile {REC_TAB_FULL_PATH} -o {OUTFILE} -V debug  -rfN"# -cN  -mL 16GB" #  -ct cyc" #  -lg log1.txt "
     # # cmd = f"--infile {REC_TAB_FULL_PATH} -V debug -o test.csv -mCSV --extract_read_group" #  -ct cyc" # -o test.csv"
     # # cmd = " --infile /media/storage/ido/test_profiler/NPC_2017/SAMEA3879639/HKNPC-087T.bam.GATKReport.mm_cntxt.6 --outfile test.B3.csv \
     # #     --scr_bin_count 3 --min_score 20 --extract_read_group \

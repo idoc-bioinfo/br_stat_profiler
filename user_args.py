@@ -64,6 +64,7 @@ class UARGS:
     VERBOSE                     =   "verbose"
     LOG_FILE                    =   "log_file"
     EXTRACT_READ_GROUP          =   "extract_read_group"
+    REL_FREQ_NORMALIZATION      =   "rel_freq_normalization"
     # deprecated
     # DEBUG_SAVE_INTERMEDIATE     =   "save_intermediate"
     # MULTIPLE_CSV_OUTPUT         =   "multiple_csv_output"
@@ -262,6 +263,14 @@ ARGS_PROPERTIES = {
         ArgPropKey.HELP:        'Extract read group name - from a ":" delimited ReadGroup String (first token)',
         ArgPropKey.SHORT_FLAG:  '-xRG',
         ArgPropKey.LONG_FLAG:   '--' + UARGS.EXTRACT_READ_GROUP,
+        ArgPropKey.ACTION:      'store_true',
+    },
+    UARGS.REL_FREQ_NORMALIZATION: {
+        ArgPropKey.DEFAULT:     False,
+        ArgPropKey.TYPE:        None,
+        ArgPropKey.HELP:        'Normalize QError result by context frequency (#observations/sum_observations)',
+        ArgPropKey.SHORT_FLAG:  '-rfN',
+        ArgPropKey.LONG_FLAG:   '--' + UARGS.REL_FREQ_NORMALIZATION,
         ArgPropKey.ACTION:      'store_true',
     },
     # UARGS.MULTIPLE_CSV_OUTPUT: {

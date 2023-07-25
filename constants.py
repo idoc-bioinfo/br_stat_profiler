@@ -24,6 +24,7 @@ class RC_TAB2:
     EVNT_TYPE_COL       = "EventType"
     EMP_QLTY_COL        = "EmpiricalQuality"
     OBS_COL             = "Observations"
+    OBS_PROP_COL        = "ObsProportion"
     ERR_OBSERV_COL      = "Errors"
     # added for preprocessing
     NAME                = "RecalTable2"
@@ -83,12 +84,22 @@ stat_ddf_schema = {
     # RT2_STAT.ID_COL                 : str,
 }
 
+# reduced_stat_ddf_scheme = {
+#     RC_TAB2.RG_COL                  :   str,
+#     RC_TAB2.RG_SCORE_BIN_COL        :   'Int8',
+#     RC_TAB2.CNTXT_COV               :   str,
+#     RT2_STAT.BIN_AVG_QLTY_ERR_COL   :   'Float64',
+# }
+
+
 reduced_stat_ddf_scheme = {
     RC_TAB2.RG_COL                  :   str,
     RC_TAB2.RG_SCORE_BIN_COL        :   'Int8',
     RC_TAB2.CNTXT_COV               :   str,
     RT2_STAT.BIN_AVG_QLTY_ERR_COL   :   'Float64',
+    RT2_STAT.BIN_OBS_SUM_COL        :   'Float64',
 }
+
 
 REDUCED_STAT_DF_COLS = list(reduced_stat_ddf_scheme.keys())
 
