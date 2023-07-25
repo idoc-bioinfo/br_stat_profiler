@@ -1,4 +1,4 @@
-# br_stat_profiler (v1.2)
+# br_stat_profiler (v2.0)
 
 Profiler of GATK BaseRecalibrator Report
 
@@ -8,6 +8,7 @@ Profiler of GATK BaseRecalibrator Report
 
 - [Preview](#preview)
 - [Installation](#installation)
+- [Running](#running)
 - [Usage](#usage)
 - [Credits](#credits)
 - [Contact](#contact)
@@ -34,6 +35,8 @@ Below is a schematic description of the profiling algorithm described for a sing
 
 8. <u>**Note:**</u> Based on the algorithm described above, it is also optional to generate profiles based on the binned read cycle covariate. (see the Help text below)
 
+![Profiling Algorithm](./Readme_imgs/Profiling%20algorithm.png)
+
 ### **Comments**:
 
 * The size of the profile (row number) depends on:
@@ -45,14 +48,22 @@ Below is a schematic description of the profiling algorithm described for a sing
 
 (1) Create a directory named "br_stat_profiler" and (2) copy into it the following 5 python files {br_stat_pfofiler.py, user_args.py, constants.py, wobble_utils.py, log_util.py}.
 
+### Running <a name="running"></a>
+```plaintext
+# bam => recalibration table
+/home/ido/gatk/gatk BaseRecalibrator -I bam_file -R genome --known-sites excluded_sites.vcf.gz -O recalibration_table  --mismatches-context-size 6 --verbosity ERROR
+# recalibration table profiling
+br_stat_profiler.py -i RecalibrationTableFile -o RecalibrationTableFile.profile
+```
 ## Usage<a name="usage"></a>
 
 ```plaintext
 usage: br_stat_profiler.py [-h] [--version] [-i <GATKReport [stdin]>] [-o <*.csv [stdout]>] [-lg <*.* [stderr]>]
-                           [-mq <int min=1 [20]>] [-mxq <int max=100 [100]>] [-eo <int 1 to 13 [3]>] [-sb <int 1 to 13 [3]>]
-                           [-cb <int 1 to 15 [10]>] [-mic <int [1]>] [-mxc <int [150]>] [-nan <float [None]>] [-sym] [-z]
-                           [-ct <choices [cntxt]>] [-co <float [-20]>] [-nW] [-wN <int [2]>] [-wRY <int [3]>]
-                           [-wKMSW <int [3]>] [-wBDHV <int [3]>] [-V <choices [info]>] [-xRG]
+                           [-mq <int min=1 [20]>] [-mxq <int max=100 [100]>] [-eo <int 1 to 13 [3]>]
+                           [-sb <int 1 to 13 [3]>] [-cb <int 1 to 15 [10]>] [-mic <int [1]>] [-mxc <int [150]>]
+                           [-nan <float [None]>] [-sym] [-z] [-ct <choices [cntxt]>] [-co <float [-20]>] [-nW]
+                           [-wN <int [2]>] [-wRY <int [3]>] [-wKMSW <int [3]>] [-wBDHV <int [3]>] [-V <choices [info]>]
+                           [-xRG] [-rfN]
 
 br_stat_profiler (v2.0) - Converts GATK (V4.4.0.0) BaseRecalibrator stat report into profiles that can be
 compared/clustered downstream. It generates a separate profile for each ReadGroup in the stat report and tabulates
@@ -67,8 +78,8 @@ options:
   -o <*.csv [stdout]>, --outfile <*.csv [stdout]>
                         Path of NON-EXISTING .csv file for the generated profile. (default=stdout)
   -lg <*.* [stderr]>, --log_file <*.* [stderr]>
-                        NON-EXISTING file for profile metadata . (default=<_io.TextIOWrapper name='<stderr>' mode='w'
-                        encoding='utf-8'>)
+                        NON-EXISTING file for profile metadata . (default=<_io.TextIOWrapper name='<stderr>'
+                        mode='w' encoding='utf-8'>)
   -mq <int min=1 [20]>, --min_score <int min=1 [20]>
                         Minimal QualityScore value for profiling (default=20)
   -mxq <int max=100 [100]>, --max_score <int max=100 [100]>
@@ -76,8 +87,8 @@ options:
   -eo <int 1 to 13 [3]>, --min_err_observed <int 1 to 13 [3]>
                         Minimal Number of Errornous Observations for profiling (default=100)
   -sb <int 1 to 13 [3]>, --scr_bin_count <int 1 to 13 [3]>
-                        # of bins to divide the QualityScore values (The profiler further averages the QError rate in
-                        each bin). (default=3)
+                        # of bins to divide the QualityScore values (The profiler further averages the QError rate
+                        in each bin). (default=3)
   -cb <int 1 to 15 [10]>, --cyc_bin_count <int 1 to 15 [10]>
                         The # of bins to divide reading cycle covariate so that reads are cut into equal fragments.
                         QEerror is averaged for each cycle bin (=fragment). (default=10)
@@ -95,8 +106,8 @@ options:
   -z, --zscore          ZScoring the final profile (preformed after the QErr cuttoff if requested). None values are
                         ignored (default=False)
   -ct <choices [cntxt]>, --cov_type <choices [cntxt]>
-                        Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle or
-                        both (context + cycle). options=['cntxt', 'cyc', 'cntxt_cyc'], (default=cntxt)
+                        Covariats type to profile QErrors. Profiling may take either the QErrors context or cycle
+                        or both (context + cycle). options=['cntxt', 'cyc', 'cntxt_cyc'], (default=cntxt)
   -co <float [-20]>, --qerr_cutoff <float [-20]>
                         Cutoff for Qerror (for removal of an hypothetical noise) (default=-20)
   -nW, --no_wobble      Do not calculate wobbled k-mers statistics - Include only k-mers with {A,C,G,T}
@@ -104,19 +115,23 @@ options:
   -wN <int [2]>, --max_wob_N_occ <int [2]>
                         Maximal occurence of wobble positions N in the k-mers statistic calculation (default=2)
   -wRY <int [3]>, --max_wob_R_Y_occ <int [3]>
-                        Maximal occurence of wobble positions R (Purines) and Y (Pyrmidines) in the k-mers statistic
-                        calculation (default=3)
+                        Maximal occurence of wobble positions R (Purines) and Y (Pyrmidines) in the k-mers
+                        statistic calculation (default=3)
   -wKMSW <int [3]>, --max_wob_K_M_S_W_occ <int [3]>
                         Maximal occurence of wobble positions K, M, S, W (with both Purine and Pyrmidine) in the
                         k-mers statistic calculation (default=3)
   -wBDHV <int [3]>, --max_wob_B_D_H_V_occ <int [3]>
-                        Maximal occurence of wobble positions B,D,H,V (without A or C or G or T respectfully) in the
-                        k-mers statistic calculation (default=2)
+                        Maximal occurence of wobble positions B,D,H,V (without A or C or G or T respectfully) in
+                        the k-mers statistic calculation (default=2)
   -V <choices [info]>, --verbose <choices [info]>
                         Verbosity level. In a non-silent mode (default), msgs are streamed to stderr (default) or
                         logfile. options=['info', 'silent', 'debug'], (default=info)
   -xRG, --extract_read_group
-                        Extract read group name - from a ":" delimited ReadGroup String (first token) (default=False)
+                        Extract read group name - from a ":" delimited ReadGroup String (first token)
+                        (default=False)
+  -rfN, --rel_freq_normalization
+                        Normalize QError result by context relative frequency (#observations/sum_observations)
+                        (default=False)
 ```
 
 ### **Input**
